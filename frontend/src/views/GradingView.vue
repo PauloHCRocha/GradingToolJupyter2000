@@ -22,6 +22,36 @@ const runnerLoading = ref(false)
 
 const lastSuggest = ref<SuggestResponse | null>(null)
 
+// Splitter between Solution and Student panes (percentage of the left pane).
+const splitRatio = ref(50)
+const splitDragging = ref(false)
+
+function startSplitDrag(e: MouseEvent) {
+  e.preventDefault()
+  const handle = e.currentTarget as HTMLElement
+  const row = handle.parentElement
+  if (!row) return
+  const rect = row.getBoundingClientRect()
+  splitDragging.value = true
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+
+  function onMove(ev: MouseEvent) {
+    const x = ev.clientX - rect.left
+    const pct = Math.max(20, Math.min(80, (x / rect.width) * 100))
+    splitRatio.value = pct
+  }
+  function onUp() {
+    splitDragging.value = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
 const totalMax = computed(() =>
   session.questions.reduce((acc, q) => acc + (Number(q.max_points) || 0), 0),
 )
@@ -375,15 +405,29 @@ function gradeFor(qid: string): number | null {
         </div>
       </section>
 
-      <section v-if="session.selectedStudentId" class="row split code-row">
-        <article class="card pane">
+      <section
+        v-if="session.selectedStudentId"
+        class="code-row"
+        :style="{ '--split-left': splitRatio + '%' }"
+      >
+        <article class="card pane left">
           <header class="card-head solution"><h3>📘 Solution</h3></header>
           <div class="pane-body">
             <NotebookViewer :cells="solutionCellsForQuestion"
                             placeholder="No solution cells for this question." />
           </div>
         </article>
-        <article class="card pane">
+        <div
+          class="splitter"
+          :class="{ dragging: splitDragging }"
+          role="separator"
+          aria-label="Resize panes"
+          aria-orientation="vertical"
+          title="Drag to resize"
+          @mousedown="startSplitDrag"
+          @dblclick="splitRatio = 50"
+        />
+        <article class="card pane right">
           <header class="card-head student">
             <h3>📝 Student submission</h3>
             <button class="btn btn-small" @click="loadStudentCodeIntoRunner">↓ Load to runner</button>
@@ -488,7 +532,51 @@ function gradeFor(qid: string): number | null {
 }
 
 .row.split { display: grid; grid-template-columns: 2fr 1fr; gap: 0.85rem; }
-.code-row { grid-template-columns: 1fr 1fr; }
+
+/* Code-row uses flex with a draggable splitter so the user can resize the
+   solution / student panes by dragging the bar between them (double-click to
+   reset to 50/50). */
+.code-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.code-row .pane.left {
+  flex: 0 0 calc(var(--split-left, 50%) - 5px);
+  min-width: 0;
+}
+.code-row .pane.right {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.splitter {
+  flex: 0 0 10px;
+  align-self: stretch;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.splitter::before {
+  content: '';
+  width: 3px;
+  height: 44px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  transition: background 0.1s, height 0.1s;
+}
+.splitter:hover::before {
+  background: var(--accent);
+  height: 64px;
+}
+.splitter.dragging::before {
+  background: var(--accent);
+  height: 100%;
+  width: 2px;
+}
 
 .card {
   background: var(--bg-card);
@@ -755,6 +843,8 @@ function gradeFor(qid: string): number | null {
 
 @media (max-width: 1100px) {
   .row.split { grid-template-columns: 1fr; }
-  .code-row { grid-template-columns: 1fr; }
+  .code-row { flex-direction: column; }
+  .code-row .pane.left { flex: 1 1 auto; }
+  .splitter { display: none; }
 }
 </style>
