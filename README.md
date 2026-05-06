@@ -1,4 +1,4 @@
-# GraderAssistant2000
+# GradingToolJupyter2000
 
 Web app for grading Jupyter (`.ipynb`) and Python (`.py`) student submissions.
 

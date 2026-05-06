@@ -36,7 +36,7 @@ async function onAnalyze() {
 <template>
   <main class="setup">
     <header>
-      <h1>GraderAssistant2000</h1>
+      <h1>GradingToolJupyter2000</h1>
       <p class="subtitle">Step 1 — Upload solution file</p>
     </header>
 

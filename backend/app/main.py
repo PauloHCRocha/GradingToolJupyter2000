@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import solution
 
-app = FastAPI(title="GraderAssistant2000")
+app = FastAPI(title="GradingToolJupyter2000")
 
 app.add_middleware(
     CORSMiddleware,
