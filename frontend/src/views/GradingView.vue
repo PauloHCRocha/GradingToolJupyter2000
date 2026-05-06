@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
-import { exportGradesUrl, runCode, suggestGrade } from '../api/client'
+import { downloadGradesCsv, runCode, suggestGrade } from '../api/client'
 import type { CellOut, RunCodeResponse, SuggestResponse } from '../api/client'
 import NotebookViewer from '../components/NotebookViewer.vue'
 
@@ -239,7 +239,7 @@ function gradeFor(qid: string): number | null {
       </div>
       <div class="actions">
         <button class="btn" @click="router.push('/setup')">← Setup</button>
-        <a class="btn btn-primary" :href="exportGradesUrl()" download>📥 Export CSV</a>
+        <button class="btn btn-primary" @click="downloadGradesCsv">📥 Export CSV</button>
         <button class="btn btn-warn" @click="router.push('/plagiarism')">⚠ Plagiarism</button>
       </div>
     </header>

@@ -1,3 +1,11 @@
+/**
+ * Client API. All operations now run entirely in the browser via Pyodide.
+ * No backend, no network calls for student data. The function signatures are
+ * unchanged from the previous fetch-based version so callers don't notice.
+ */
+
+import { callApi } from '../runtime/pyodide'
+
 export interface DetectedQuestion {
   id: string
   label: string
@@ -127,55 +135,46 @@ export interface PlagiarismCompareResponse {
   code2: string
 }
 
-async function jsonOrThrow<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(detail.detail ?? `Request failed (${res.status})`)
-  }
-  return res.json() as Promise<T>
+async function fileBytes(file: File): Promise<Uint8Array> {
+  return new Uint8Array(await file.arrayBuffer())
 }
 
 export async function analyzeSolution(file: File): Promise<SolutionAnalysis> {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await fetch('/api/solution/analyze', { method: 'POST', body: form })
-  return jsonOrThrow<SolutionAnalysis>(res)
+  const bytes = await fileBytes(file)
+  return callApi<SolutionAnalysis>('analyze_solution', bytes, file.name)
 }
 
 export async function getSolutionCells(): Promise<SolutionDetail> {
-  const res = await fetch('/api/solution/cells')
-  return jsonOrThrow<SolutionDetail>(res)
+  return callApi<SolutionDetail>('get_solution_cells')
 }
 
 export async function updateQuestions(questions: DetectedQuestion[]): Promise<DetectedQuestion[]> {
-  const res = await fetch('/api/solution/questions', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(questions),
-  })
-  return jsonOrThrow<DetectedQuestion[]>(res)
+  // Strip Vue reactive proxies before sending — Pyodide expects plain objects.
+  const plain = questions.map((q) => ({
+    id: q.id,
+    label: q.label,
+    max_points: q.max_points,
+    statement: q.statement,
+    cell_indices: [...q.cell_indices],
+  }))
+  return callApi<DetectedQuestion[]>('update_questions', plain)
 }
 
 export async function uploadSubmissions(file: File): Promise<SubmissionsUploadResult> {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await fetch('/api/submissions/upload', { method: 'POST', body: form })
-  return jsonOrThrow<SubmissionsUploadResult>(res)
+  const bytes = await fileBytes(file)
+  return callApi<SubmissionsUploadResult>('upload_submissions', bytes)
 }
 
 export async function listSubmissions(sort: 'name' | 'number' = 'name'): Promise<StudentInfo[]> {
-  const res = await fetch(`/api/submissions?sort=${sort}`)
-  return jsonOrThrow<StudentInfo[]>(res)
+  return callApi<StudentInfo[]>('list_submissions', sort)
 }
 
 export async function getSubmission(studentId: string): Promise<StudentDetail> {
-  const res = await fetch(`/api/submissions/${encodeURIComponent(studentId)}`)
-  return jsonOrThrow<StudentDetail>(res)
+  return callApi<StudentDetail>('get_submission', studentId)
 }
 
 export async function getStudentGrades(studentId: string): Promise<StudentGrades> {
-  const res = await fetch(`/api/grades/${encodeURIComponent(studentId)}`)
-  return jsonOrThrow<StudentGrades>(res)
+  return callApi<StudentGrades>('get_student_grades', studentId)
 }
 
 export async function setStudentGrade(
@@ -183,64 +182,53 @@ export async function setStudentGrade(
   questionId: string,
   payload: { points: number; comment: string },
 ): Promise<StudentGrades> {
-  const res = await fetch(
-    `/api/grades/${encodeURIComponent(studentId)}/${encodeURIComponent(questionId)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    },
+  return callApi<StudentGrades>(
+    'set_student_grade',
+    studentId,
+    questionId,
+    payload.points,
+    payload.comment,
   )
-  return jsonOrThrow<StudentGrades>(res)
 }
 
 export async function suggestGrade(
   studentId: string,
   questionId: string,
 ): Promise<SuggestResponse> {
-  const res = await fetch(
-    `/api/suggest/${encodeURIComponent(studentId)}/${encodeURIComponent(questionId)}`,
-    { method: 'POST' },
-  )
-  return jsonOrThrow<SuggestResponse>(res)
+  return callApi<SuggestResponse>('suggest', studentId, questionId)
 }
 
 export async function runCode(code: string, stdin = ''): Promise<RunCodeResponse> {
-  const res = await fetch('/api/run_code', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, stdin }),
-  })
-  return jsonOrThrow<RunCodeResponse>(res)
+  return callApi<RunCodeResponse>('run_code', code, stdin)
 }
 
 export async function plagiarismAnalyze(
   threshold: number,
-  signal?: AbortSignal,
+  _signal?: AbortSignal,
 ): Promise<PlagiarismAnalyzeResponse> {
-  const res = await fetch('/api/plagiarism/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ threshold }),
-    signal,
-  })
-  return jsonOrThrow<PlagiarismAnalyzeResponse>(res)
+  // Note: Pyodide work runs synchronously inside the wasm runtime; we cannot
+  // truly abort once it's started. The signal is accepted so callers don't
+  // need to change.
+  return callApi<PlagiarismAnalyzeResponse>('plagiarism_analyze', threshold)
 }
 
 export async function plagiarismCompare(
   student1_id: string,
   student2_id: string,
-  signal?: AbortSignal,
+  _signal?: AbortSignal,
 ): Promise<PlagiarismCompareResponse> {
-  const res = await fetch('/api/plagiarism/compare', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ student1_id, student2_id }),
-    signal,
-  })
-  return jsonOrThrow<PlagiarismCompareResponse>(res)
+  return callApi<PlagiarismCompareResponse>('plagiarism_compare', student1_id, student2_id)
 }
 
-export function exportGradesUrl(): string {
-  return '/api/grades/export.csv'
+export async function downloadGradesCsv(): Promise<void> {
+  const csv = await callApi<string>('export_grades_csv')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'grades.csv'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
