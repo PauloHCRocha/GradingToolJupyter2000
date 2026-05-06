@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { getPyodide, runtimeStage, runtimeError } from './runtime/pyodide'
+
+const route = useRoute()
 
 onMounted(() => {
   // Eagerly start loading Pyodide on app boot so the user is ready by the
@@ -9,6 +12,12 @@ onMounted(() => {
     /* runtimeError is already populated */
   })
 })
+
+// The landing page renders immediately; the runtime loads in the background.
+// Workspace routes (setup/grading/plagiarism) need Python ready, so they get
+// the boot overlay until it is.
+const needsRuntime = computed(() => route.name && route.name !== 'landing')
+const showBoot = computed(() => needsRuntime.value && runtimeStage.value !== 'ready')
 
 const stageLabel: Record<string, string> = {
   idle: 'Starting…',
@@ -20,8 +29,10 @@ const stageLabel: Record<string, string> = {
 </script>
 
 <template>
+  <RouterView />
+
   <Transition name="boot">
-    <div v-if="runtimeStage !== 'ready'" class="boot-overlay">
+    <div v-if="showBoot" class="boot-overlay">
       <div class="boot-card">
         <div class="boot-icon">🐍</div>
         <h1>GradingToolJupyter2000</h1>
@@ -34,14 +45,10 @@ const stageLabel: Record<string, string> = {
           <span class="stage-text">{{ stageLabel[runtimeStage] ?? runtimeStage }}</span>
         </div>
         <p class="hint">First load can take 10-20s. Subsequent visits are instant (cached).</p>
-        <p v-if="runtimeStage === 'error'" class="err">
-          {{ runtimeError }}
-        </p>
+        <p v-if="runtimeStage === 'error'" class="err">{{ runtimeError }}</p>
       </div>
     </div>
   </Transition>
-
-  <RouterView v-if="runtimeStage === 'ready'" />
 </template>
 
 <style scoped>
@@ -80,10 +87,7 @@ const stageLabel: Record<string, string> = {
   font-size: 0.9rem;
   font-weight: 500;
 }
-.stage.error {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
+.stage.error { background: var(--danger-soft); color: var(--danger); }
 .stage .stage-text { letter-spacing: 0.2px; }
 
 .hint { color: var(--text-muted); font-size: 0.8rem; margin: 0; }
