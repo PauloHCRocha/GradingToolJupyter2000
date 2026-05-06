@@ -73,188 +73,349 @@ async function onContinue() {
 </script>
 
 <template>
-  <main class="setup">
-    <header>
-      <h1>GradingToolJupyter2000</h1>
-      <p class="subtitle">Setup the grading session</p>
+  <div class="page">
+    <header class="appbar">
+      <div class="title">
+        <h1>📋 GradingToolJupyter2000</h1>
+        <span class="meta">Configure a new grading session</span>
+      </div>
     </header>
 
-    <section class="step">
-      <header class="step-head">
-        <span class="num">1</span>
-        <h2>Upload solution file</h2>
-      </header>
-      <div class="step-body">
-        <div class="upload">
-          <label class="file-input">
-            <input type="file" accept=".ipynb,.py" @change="pickSolution" />
-            <span>{{ solutionFile?.name ?? 'Choose a .ipynb or .py file' }}</span>
-          </label>
-          <button :disabled="!solutionFile || loadingSolution" @click="onAnalyze">
-            {{ loadingSolution ? 'Analyzing…' : 'Analyze' }}
-          </button>
-        </div>
-        <p v-if="errorSolution" class="error">{{ errorSolution }}</p>
+    <main class="body">
+      <ol class="stepper">
+        <li :class="{ active: !session.solution, done: !!session.solution }">
+          <span class="dot">1</span> Solution file
+        </li>
+        <li :class="{ active: !!session.solution && !session.students.length, done: session.students.length > 0 }">
+          <span class="dot">2</span> Submissions zip
+        </li>
+        <li :class="{ active: canContinue }">
+          <span class="dot">3</span> Start grading
+        </li>
+      </ol>
 
-        <div v-if="session.solution" class="results">
-          <p class="meta">
-            <strong>{{ session.solution.filename }}</strong> ·
-            type <code>{{ session.solution.file_type }}</code> ·
-            {{ session.questions.length }} question(s) ·
-            total <strong>{{ totalMax }}</strong> points
-          </p>
-          <table v-if="session.questions.length">
-            <thead>
-              <tr><th>ID</th><th>Label</th><th>Max points</th><th>Statement</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="q in session.questions" :key="q.id">
-                <td><code>{{ q.id }}</code></td>
-                <td>{{ q.label }}</td>
-                <td>
-                  <input
-                    type="number" step="0.5" min="0"
-                    :value="q.max_points"
-                    @input="(e) => session.updateMaxPoints(q.id, Number((e.target as HTMLInputElement).value))"
-                  />
-                </td>
-                <td class="statement">{{ q.statement.slice(0, 140) }}{{ q.statement.length > 140 ? '…' : '' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+      <!-- Step 1 -->
+      <section class="card">
+        <header class="card-head">
+          <h2><span class="num">1</span> Upload solution file</h2>
+          <span class="card-meta">.ipynb or .py — questions detected automatically</span>
+        </header>
+        <div class="card-body">
+          <div class="upload">
+            <label class="file-input" :class="{ filled: !!solutionFile }">
+              <input type="file" accept=".ipynb,.py" @change="pickSolution" />
+              <span class="icon">{{ solutionFile ? '📄' : '⬆' }}</span>
+              <span class="text">{{ solutionFile?.name ?? 'Choose a .ipynb or .py file' }}</span>
+            </label>
+            <button class="btn btn-primary" :disabled="!solutionFile || loadingSolution" @click="onAnalyze">
+              <span v-if="loadingSolution" class="spin" />
+              {{ loadingSolution ? 'Analyzing…' : 'Analyze' }}
+            </button>
+          </div>
+          <p v-if="errorSolution" class="error">{{ errorSolution }}</p>
 
-    <section class="step" :class="{ disabled: !session.solution }">
-      <header class="step-head">
-        <span class="num">2</span>
-        <h2>Upload student submissions (.zip)</h2>
-      </header>
-      <div class="step-body">
-        <div class="upload">
-          <label class="file-input">
-            <input type="file" accept=".zip" :disabled="!session.solution" @change="pickSubmissions" />
-            <span>{{ submissionsFile?.name ?? 'Choose a zip with submission folders' }}</span>
-          </label>
-          <button
-            :disabled="!submissionsFile || !session.solution || loadingSubmissions"
-            @click="onUploadSubmissions"
-          >
-            {{ loadingSubmissions ? 'Uploading…' : 'Upload' }}
-          </button>
+          <div v-if="session.solution" class="results">
+            <div class="result-meta">
+              <span><strong>{{ session.solution.filename }}</strong></span>
+              <span class="pill type">{{ session.solution.file_type }}</span>
+              <span class="pill">{{ session.questions.length }} question(s)</span>
+              <span class="pill total">{{ totalMax }} points total</span>
+            </div>
+            <div class="qtable-wrap">
+              <table class="qtable">
+                <thead>
+                  <tr><th>ID</th><th>Label</th><th class="num-col">Max points</th><th>Statement</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="q in session.questions" :key="q.id">
+                    <td><code class="qcode">{{ q.id }}</code></td>
+                    <td>{{ q.label }}</td>
+                    <td class="num-col">
+                      <input class="pts-input"
+                        type="number" step="0.5" min="0"
+                        :value="q.max_points"
+                        @input="(e) => session.updateMaxPoints(q.id, Number((e.target as HTMLInputElement).value))"
+                      />
+                    </td>
+                    <td class="statement">
+                      {{ q.statement.slice(0, 130) }}{{ q.statement.length > 130 ? '…' : '' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <p v-if="errorSubmissions" class="error">{{ errorSubmissions }}</p>
+      </section>
 
-        <div v-if="session.students.length" class="results">
-          <p class="meta">
-            <strong>{{ session.students.length }}</strong> students loaded
-            <span v-if="session.warnings.length" class="warn">
-              · {{ session.warnings.length }} warning(s)
-            </span>
-          </p>
-          <details v-if="session.warnings.length">
-            <summary>Show warnings</summary>
-            <ul>
-              <li v-for="(w, i) in session.warnings" :key="i">{{ w }}</li>
-            </ul>
-          </details>
+      <!-- Step 2 -->
+      <section class="card" :class="{ dimmed: !session.solution }">
+        <header class="card-head">
+          <h2><span class="num">2</span> Upload student submissions</h2>
+          <span class="card-meta">.zip with the Moodle-style folders inside</span>
+        </header>
+        <div class="card-body">
+          <div class="upload">
+            <label class="file-input" :class="{ filled: !!submissionsFile, disabled: !session.solution }">
+              <input type="file" accept=".zip" :disabled="!session.solution" @change="pickSubmissions" />
+              <span class="icon">{{ submissionsFile ? '📦' : '⬆' }}</span>
+              <span class="text">{{ submissionsFile?.name ?? 'Choose a zip with submission folders' }}</span>
+            </label>
+            <button class="btn btn-primary"
+              :disabled="!submissionsFile || !session.solution || loadingSubmissions"
+              @click="onUploadSubmissions">
+              <span v-if="loadingSubmissions" class="spin" />
+              {{ loadingSubmissions ? 'Uploading…' : 'Upload' }}
+            </button>
+          </div>
+          <p v-if="errorSubmissions" class="error">{{ errorSubmissions }}</p>
+
+          <div v-if="session.students.length" class="results">
+            <div class="result-meta">
+              <span><strong>{{ session.students.length }}</strong> students loaded</span>
+              <span v-if="session.warnings.length" class="pill warn">
+                {{ session.warnings.length }} warning(s)
+              </span>
+            </div>
+            <details v-if="session.warnings.length" class="warn-details">
+              <summary>Show warnings</summary>
+              <ul>
+                <li v-for="(w, i) in session.warnings" :key="i">{{ w }}</li>
+              </ul>
+            </details>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <footer class="continue">
-      <button class="primary" :disabled="!canContinue || continuing" @click="onContinue">
-        {{ continuing ? 'Loading…' : 'Continue to grading →' }}
-      </button>
-    </footer>
-  </main>
+      <!-- Continue -->
+      <footer class="continue">
+        <button class="btn btn-primary big" :disabled="!canContinue || continuing" @click="onContinue">
+          <span v-if="continuing" class="spin" />
+          {{ continuing ? 'Loading…' : 'Continue to grading →' }}
+        </button>
+      </footer>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-.setup {
-  max-width: 960px;
+.page { min-height: 100vh; background: var(--bg-page); }
+
+/* Appbar */
+.appbar {
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 0.7rem 1.25rem;
+  display: flex; align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.appbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
+.appbar .title { display: flex; flex-direction: column; }
+
+/* Body */
+.body {
+  max-width: 940px;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  text-align: left;
+  padding: 1.25rem 1.25rem 3rem;
+  display: flex; flex-direction: column; gap: 1rem;
 }
 
-header h1 { margin: 0; }
-.subtitle { color: #6b7280; margin: 0.25rem 0 1.5rem; }
+/* Stepper */
+.stepper {
+  display: flex; gap: 0; align-items: center;
+  list-style: none; padding: 0; margin: 0 0 0.5rem;
+}
+.stepper li {
+  flex: 1;
+  position: relative;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+.stepper li::after {
+  content: ''; position: absolute; right: 0; top: 50%;
+  width: 30%; height: 1px; background: var(--border);
+}
+.stepper li:last-child::after { display: none; }
+.stepper li .dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: 0.78rem; font-weight: 600;
+}
+.stepper li.active .dot {
+  background: var(--accent); border-color: var(--accent); color: white;
+}
+.stepper li.active { color: var(--text-strong); }
+.stepper li.done .dot {
+  background: var(--success); border-color: var(--success); color: white;
+}
+.stepper li.done { color: var(--success); }
 
-.step {
-  border: 1px solid #e5e7eb;
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: white;
-  margin-bottom: 1.25rem;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   transition: opacity 0.2s;
 }
-.step.disabled { opacity: 0.6; }
-.step-head {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-}
-.step-head h2 { margin: 0; font-size: 1rem; }
-.step-head .num {
-  display: inline-flex;
-  align-items: center; justify-content: center;
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  background: #2563eb; color: white; font-size: 0.85rem; font-weight: 600;
-}
-.step-body { padding: 1rem; }
+.card.dimmed { opacity: 0.55; }
 
-.upload { display: flex; gap: 0.75rem; align-items: center; }
+.card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 1rem;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+}
+.card-head h2 {
+  margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-strong);
+  display: flex; align-items: center; gap: 0.55rem;
+}
+.card-head .num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: white; font-size: 0.78rem;
+}
+.card-head .card-meta { font-size: 0.78rem; color: var(--text-muted); }
+.card-body { padding: 1rem 1.1rem; }
+
+/* Upload */
+.upload { display: flex; gap: 0.65rem; align-items: center; }
 .file-input {
   flex: 1;
-  padding: 0.5rem 0.75rem;
-  border: 1px dashed #cbd5e1;
-  border-radius: 6px;
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-soft);
+  border: 2px dashed var(--border-strong);
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9rem;
-  color: #475569;
+  transition: border-color 0.15s, background 0.15s;
 }
+.file-input:hover:not(.disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.file-input.filled { border-style: solid; border-color: var(--success); background: var(--success-soft); }
+.file-input.disabled { cursor: not-allowed; opacity: 0.55; }
 .file-input input { display: none; }
+.file-input .icon { font-size: 1.05rem; }
+.file-input .text { font-size: 0.9rem; color: var(--text); }
 
-button {
-  padding: 0.5rem 1rem;
+.error {
+  margin-top: 0.7rem;
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 0.45rem 0.7rem;
   border-radius: 6px;
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.error { color: #b91c1c; margin-top: 0.75rem; font-size: 0.9rem; }
-.warn { color: #92400e; }
 
 .results { margin-top: 1rem; }
-.meta { color: #4b5563; font-size: 0.9rem; }
-
-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.88rem; }
-th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid #f0f1f3; vertical-align: top; }
-th { background: #fafafa; font-weight: 600; color: #374151; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; }
-.statement { color: #6b7280; font-size: 0.85rem; max-width: 360px; }
-input[type="number"] {
-  width: 70px; padding: 0.25rem 0.4rem; border: 1px solid #d1d5db; border-radius: 4px;
+.result-meta {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem; color: var(--text);
+}
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.pill.type {
+  background: var(--accent-soft);
+  border-color: #bfdbfe;
+  color: #1e40af;
+  font-family: ui-monospace, monospace;
+}
+.pill.total {
+  background: var(--success-soft);
+  border-color: #a7f3d0;
+  color: #065f46;
+  font-weight: 600;
+}
+.pill.warn {
+  background: var(--warning-soft);
+  border-color: #fde68a;
+  color: #92400e;
 }
 
-details summary { cursor: pointer; color: #4b5563; }
-details ul { font-size: 0.85rem; color: #4b5563; max-height: 200px; overflow-y: auto; }
+/* Question table */
+.qtable-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.qtable { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.qtable th {
+  background: var(--bg-soft);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  font-size: 0.74rem; font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+}
+.qtable td {
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.qtable tr:last-child td { border-bottom: none; }
+.qtable tr:hover { background: var(--bg-soft); }
+.num-col { width: 110px; }
+.qcode {
+  background: var(--accent-soft);
+  color: #1e40af;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid #bfdbfe;
+}
+.pts-input {
+  width: 80px; padding: 0.3rem 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  text-align: center;
+}
+.statement { color: var(--text-muted); font-size: 0.83rem; max-width: 400px; }
 
-.continue {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
+.warn-details { margin-top: 0.7rem; }
+.warn-details summary {
+  cursor: pointer; color: var(--warning);
+  font-size: 0.85rem;
 }
-.continue .primary {
-  padding: 0.7rem 1.5rem;
-  font-size: 1rem;
+.warn-details ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.83rem; color: var(--text-muted);
+  max-height: 200px; overflow-y: auto;
 }
+
+/* Continue */
+.continue { display: flex; justify-content: flex-end; }
+.btn.big { padding: 0.7rem 1.5rem; font-size: 1rem; }
+
+/* spinner */
+.spin {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

@@ -15,7 +15,6 @@ const suggesting = ref(false)
 const error = ref<string | null>(null)
 const toast = ref<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
-const showRunner = ref(false)
 const runnerCode = ref('')
 const runnerStdin = ref('')
 const runnerResult = ref<RunCodeResponse | null>(null)
@@ -26,15 +25,17 @@ const lastSuggest = ref<SuggestResponse | null>(null)
 const totalMax = computed(() =>
   session.questions.reduce((acc, q) => acc + (Number(q.max_points) || 0), 0),
 )
-
 const totalCurrent = computed(() =>
   Object.values(session.studentGrades).reduce((acc, g) => acc + (g?.points ?? 0), 0),
 )
-
 const gradedCount = computed(() => session.students.filter((s) => s.total_grade > 0).length)
 
 const selectedQuestion = computed(() =>
   session.questions.find((q) => q.id === session.selectedQuestionId) ?? null,
+)
+
+const selectedQuestionMax = computed(() =>
+  selectedQuestion.value ? Number(selectedQuestion.value.max_points) || 0 : 0,
 )
 
 const solutionCellsForQuestion = computed<CellOut[]>(() => {
@@ -60,6 +61,22 @@ const studentCodeJoined = computed(() =>
     .filter((c) => c.cell_type === 'code')
     .map((c) => c.source)
     .join('\n\n'),
+)
+
+watch(
+  () => session.selectedQuestionId,
+  () => {
+    runnerCode.value = studentCodeJoined.value
+    runnerResult.value = null
+  },
+)
+
+watch(
+  () => session.studentDetail?.info.id,
+  () => {
+    runnerCode.value = studentCodeJoined.value
+    runnerResult.value = null
+  },
 )
 
 onMounted(async () => {
@@ -104,6 +121,10 @@ async function selectStudent(id: string) {
   }
 }
 
+async function onStudentChange(e: Event) {
+  await selectStudent((e.target as HTMLSelectElement).value)
+}
+
 function syncDraft() {
   for (const q of session.questions) {
     const g = session.studentGrades[q.id]
@@ -142,8 +163,7 @@ async function save(qid: string) {
 async function quickGrade(qid: string, pct: number) {
   const q = session.questions.find((x) => x.id === qid)
   if (!q) return
-  const v = Math.round(((q.max_points || 0) * pct) * 100) / 100
-  draft[qid].points = v
+  draft[qid].points = Math.round((q.max_points || 0) * pct * 100) / 100
   await save(qid)
 }
 
@@ -162,7 +182,7 @@ async function onSuggest() {
   try {
     const res = await suggestGrade(session.selectedStudentId, session.selectedQuestionId)
     lastSuggest.value = res
-    if (res.points !== null) {
+    if (res.points !== null && draft[session.selectedQuestionId]) {
       draft[session.selectedQuestionId].points = res.points
       draft[session.selectedQuestionId].comment = res.comment
     }
@@ -171,12 +191,6 @@ async function onSuggest() {
   } finally {
     suggesting.value = false
   }
-}
-
-function openRunner() {
-  runnerCode.value = studentCodeJoined.value
-  runnerResult.value = null
-  showRunner.value = true
 }
 
 async function onRun() {
@@ -196,567 +210,545 @@ async function onRun() {
   }
 }
 
-function statusClass(s: { total_grade: number; has_error: boolean; invisible_count: number }) {
-  if (s.has_error) return 'err'
-  if (s.invisible_count > 0) return 'flagged'
-  if (s.total_grade > 0) return 'graded'
-  return 'pending'
+function loadStudentCodeIntoRunner() {
+  runnerCode.value = studentCodeJoined.value
+  runnerResult.value = null
+}
+
+function gradeFor(qid: string): number | null {
+  const g = session.studentGrades[qid]
+  return g ? Number(g.points) : null
 }
 </script>
 
 <template>
-  <div class="layout">
-    <header class="topbar">
-      <div class="left">
-        <button class="ghost" @click="router.push('/setup')">← Setup</button>
-        <h1>Assignment Grading Tool</h1>
+  <div class="page">
+    <header class="appbar">
+      <div class="title">
+        <h1>📋 Assignment Grading Tool</h1>
         <span class="meta">
           {{ session.students.length }} students · {{ gradedCount }} graded ·
-          {{ session.questions.length }} questions / {{ totalMax }} pts
+          {{ session.questions.length }} questions ({{ totalMax }} pts total)
         </span>
       </div>
-      <div class="right">
-        <button class="ghost" @click="router.push('/plagiarism')">⚠ Plagiarism</button>
-        <a class="primary" :href="exportGradesUrl()" download>Export CSV</a>
+      <div class="actions">
+        <button class="btn" @click="router.push('/setup')">← Setup</button>
+        <a class="btn btn-primary" :href="exportGradesUrl()" download>📥 Export CSV</a>
+        <button class="btn btn-warn" @click="router.push('/plagiarism')">⚠ Plagiarism</button>
       </div>
     </header>
 
-    <aside class="sidebar">
-      <div class="sidebar-controls">
-        <span class="label">Sort by</span>
-        <button
-          class="toggle" :class="{ active: session.sortOrder === 'name' }"
-          @click="session.setSortOrder('name')"
-        >Name</button>
-        <button
-          class="toggle" :class="{ active: session.sortOrder === 'number' }"
-          @click="session.setSortOrder('number')"
-        >Number</button>
-      </div>
-      <div class="nav-row">
-        <button @click="session.navigate(-1).then(syncDraft)">‹ Prev</button>
-        <span class="pos">
-          {{ session.currentIndex + 1 || '—' }} / {{ session.students.length }}
+    <nav class="topnav">
+      <button class="btn nav-btn" @click="session.navigate(-1).then(syncDraft)">← Previous</button>
+      <div class="cur-student">
+        <span v-if="session.studentDetail" class="cs-name">
+          {{ session.studentDetail.info.name }}
         </span>
-        <button @click="session.navigate(+1).then(syncDraft)">Next ›</button>
+        <span v-if="session.studentDetail" class="cs-meta">
+          #{{ session.studentDetail.info.id }} ·
+          <code>{{ session.studentDetail.info.filename }}</code>
+        </span>
+        <span v-else class="cs-meta muted">No student selected</span>
       </div>
-      <ul>
-        <li
-          v-for="s in session.students"
-          :key="s.id"
-          :class="{ active: s.id === session.selectedStudentId, [statusClass(s)]: true }"
-          @click="selectStudent(s.id)"
-        >
-          <div class="row1">
-            <span class="dot" />
-            <strong>{{ s.name }}</strong>
-          </div>
-          <div class="row2">
-            <span class="num">#{{ s.id }}</span>
-            <span class="grade">{{ s.total_grade.toFixed(1) }} / {{ totalMax }}</span>
-          </div>
-          <div v-if="s.invisible_count > 0" class="badge ai">⚠ {{ s.invisible_count }} unicode</div>
-          <div v-if="s.has_error" class="err-msg">{{ s.error }}</div>
-        </li>
-      </ul>
-    </aside>
+      <button class="btn nav-btn" @click="session.navigate(+1).then(syncDraft)">Next →</button>
+    </nav>
 
-    <main class="main">
-      <p v-if="error" class="error">{{ error }}</p>
-
-      <div v-if="!session.studentDetail" class="placeholder">
-        Select a student from the sidebar to start grading. Use ← / → to navigate.
-      </div>
-
-      <template v-else>
-        <header class="student-head">
-          <div>
-            <h2>
-              {{ session.studentDetail.info.name }}
-              <span class="num">#{{ session.studentDetail.info.id }}</span>
-            </h2>
-            <span class="meta"><code>{{ session.studentDetail.info.filename }}</code></span>
+    <main class="body">
+      <section class="row split">
+        <article class="card selector">
+          <header class="card-head">
+            <h3>Select student</h3>
+            <div class="sort-toggle">
+              <span class="lbl">Sort by</span>
+              <button :class="{ active: session.sortOrder === 'name' }"
+                      @click="session.setSortOrder('name')">Name</button>
+              <button :class="{ active: session.sortOrder === 'number' }"
+                      @click="session.setSortOrder('number')">Number</button>
+            </div>
+          </header>
+          <select class="student-select" :value="session.selectedStudentId" @change="onStudentChange">
+            <option value="" disabled>— pick a student —</option>
+            <option v-for="s in session.students" :key="s.id" :value="s.id" :disabled="s.has_error">
+              {{ s.name }} (#{{ s.id }})
+              <template v-if="s.total_grade > 0">— {{ s.total_grade.toFixed(1) }}/{{ totalMax }}</template>
+              <template v-if="s.invisible_count">⚠ {{ s.invisible_count }}</template>
+              <template v-if="s.has_error">⚠ error</template>
+            </option>
+          </select>
+          <p class="hint">Tip: use ← / → keys to navigate.</p>
+          <div v-if="session.studentDetail?.invisible_findings.length" class="alert warn">
+            ⚠ <strong>{{ session.studentDetail.invisible_findings.length }}</strong>
+            suspicious unicode character(s) detected in code (possible AI paste).
           </div>
-          <div class="total">
-            <span class="label">Current grade</span>
-            <strong>{{ totalCurrent.toFixed(1) }} / {{ totalMax }}</strong>
-          </div>
+        </article>
+
+        <article class="card summary">
+          <header class="card-head"><h3>Grade summary</h3></header>
+          <ul class="summary-list">
+            <li v-for="q in session.questions" :key="q.id"
+                :class="{ done: gradeFor(q.id) !== null && (gradeFor(q.id) ?? 0) > 0 }">
+              <span class="qid">{{ q.id }}</span>
+              <span class="qval">
+                <template v-if="gradeFor(q.id) !== null">
+                  {{ gradeFor(q.id)?.toFixed(2) }}
+                </template>
+                <template v-else>—</template>
+                <span class="qmax"> / {{ q.max_points }}</span>
+              </span>
+            </li>
+            <li class="total">
+              <span class="qid">Total</span>
+              <span class="qval"><strong>{{ totalCurrent.toFixed(1) }}</strong> / {{ totalMax }}</span>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="card questions">
+        <header class="card-head"><h3>Questions</h3></header>
+        <div class="qbar">
+          <button v-for="q in session.questions" :key="q.id"
+                  class="qchip"
+                  :class="{ active: q.id === session.selectedQuestionId, graded: (gradeFor(q.id) ?? 0) > 0 }"
+                  @click="session.selectQuestion(q.id)">
+            <span class="qchip-id">{{ q.id }}</span>
+            <span class="qchip-pts">{{ q.max_points }}pt</span>
+          </button>
+        </div>
+        <p v-if="selectedQuestion" class="qstatement">
+          {{ selectedQuestion.statement.slice(0, 360) }}{{ selectedQuestion.statement.length > 360 ? '…' : '' }}
+        </p>
+      </section>
+
+      <section v-if="selectedQuestion && session.selectedStudentId" class="card grading">
+        <header class="card-head">
+          <h3>Grade · {{ selectedQuestion.label }}</h3>
+          <span class="card-meta">Max: <strong>{{ selectedQuestionMax }}</strong></span>
         </header>
-
-        <div v-if="session.studentDetail.invisible_findings.length" class="warn">
-          ⚠ Detected <strong>{{ session.studentDetail.invisible_findings.length }}</strong>
-          suspicious unicode characters in code (possible AI paste). E.g.
-          <code>{{ session.studentDetail.invisible_findings[0].name }}</code>
-          at line {{ session.studentDetail.invisible_findings[0].line }}.
-        </div>
-
-        <nav class="qbar">
-          <button
-            v-for="q in session.questions" :key="q.id"
-            :class="{ active: q.id === session.selectedQuestionId }"
-            @click="session.selectQuestion(q.id)"
-          >
-            {{ q.id }} <span class="qpts">({{ q.max_points }}pt)</span>
-          </button>
-        </nav>
-
-        <div v-if="selectedQuestion" class="qstatement">
-          {{ selectedQuestion.statement.slice(0, 280) }}{{ selectedQuestion.statement.length > 280 ? '…' : '' }}
-        </div>
-
-        <section class="compare">
-          <div class="pane">
-            <header><span>Solution</span></header>
-            <div class="pane-body">
-              <NotebookViewer
-                :cells="solutionCellsForQuestion"
-                placeholder="No solution cells for this question."
-              />
-            </div>
-          </div>
-          <div class="pane">
-            <header><span>Student submission</span><button class="run-btn" @click="openRunner">▶ Run code</button></header>
-            <div class="pane-body">
-              <NotebookViewer
-                :cells="studentCellsForQuestion"
-                placeholder="No student cells for this question."
-              />
-            </div>
-          </div>
-        </section>
-      </template>
-    </main>
-
-    <section class="grading">
-      <h2>Grading</h2>
-      <div v-if="!session.selectedStudentId" class="placeholder">No student selected.</div>
-      <template v-else>
-        <ul class="questions">
-          <li
-            v-for="q in session.questions" :key="q.id"
-            :class="{ active: q.id === session.selectedQuestionId }"
-            @click="session.selectQuestion(q.id)"
-          >
-            <div class="qhead">
-              <strong>{{ q.label }}</strong>
-              <span class="qmax">/ {{ q.max_points }}</span>
-            </div>
-            <div class="qrow">
-              <input
-                type="number" step="0.25" min="0" :max="q.max_points"
-                v-model.number="draft[q.id].points" @blur="clamp(q.id)"
-              />
-              <button class="primary save" :disabled="saving[q.id]" @click.stop="save(q.id)">
-                {{ saving[q.id] ? '…' : 'Save' }}
-              </button>
-            </div>
-            <div class="quick">
-              <button v-for="p in [0, 0.25, 0.5, 0.75, 1]" :key="p"
-                @click.stop="quickGrade(q.id, p)">{{ p * 100 }}%</button>
-            </div>
-            <textarea
-              v-model="draft[q.id].comment"
-              placeholder="Comment (optional)"
-              rows="2"
-              @click.stop
+        <div class="grade-row">
+          <div class="grade-input">
+            <input
+              type="number" step="0.25" min="0" :max="selectedQuestionMax"
+              v-model.number="draft[selectedQuestion.id].points"
+              @blur="clamp(selectedQuestion.id)"
             />
-          </li>
-        </ul>
-
-        <div class="suggest-block">
-          <button class="suggest" :disabled="suggesting || !session.selectedQuestionId" @click="onSuggest">
-            {{ suggesting ? 'Thinking…' : '✨ Suggest grade for ' + (session.selectedQuestionId ?? '—') }}
+            <span class="of">/ {{ selectedQuestionMax }}</span>
+          </div>
+          <button class="btn btn-suggest" :disabled="suggesting" @click="onSuggest">
+            <span v-if="suggesting" class="spin" />
+            {{ suggesting ? 'Analyzing…' : '✨ Suggest grade' }}
           </button>
-          <div v-if="lastSuggest" class="suggest-result" :class="lastSuggest.confidence">
-            <strong>{{ lastSuggest.points }}</strong> / {{ lastSuggest.max_points }}
-            · score <strong>{{ Math.round(lastSuggest.score * 100) }}%</strong>
-            · confidence <strong>{{ lastSuggest.confidence }}</strong>
+          <button class="btn btn-primary" :disabled="saving[selectedQuestion.id]"
+                  @click="save(selectedQuestion.id)">
+            {{ saving[selectedQuestion.id] ? 'Saving…' : '💾 Save grade' }}
+          </button>
+        </div>
+
+        <div class="quick-row">
+          <span class="quick-lbl">Quick grade</span>
+          <button v-for="p in [0, 0.25, 0.5, 0.75, 1]" :key="p" class="btn quick"
+                  @click="quickGrade(selectedQuestion.id, p)">
+            {{ p * 100 }}%
+          </button>
+        </div>
+
+        <textarea
+          class="comment"
+          v-model="draft[selectedQuestion.id].comment"
+          placeholder="Comment (optional) — auto-filled when you click Suggest grade"
+          rows="3"
+        />
+
+        <div v-if="lastSuggest" class="suggest-result" :class="lastSuggest.confidence">
+          <header>
+            <span class="conf-pill" :class="lastSuggest.confidence">{{ lastSuggest.confidence }}</span>
+            <strong>{{ lastSuggest.points }} / {{ lastSuggest.max_points }}</strong>
+            · score {{ Math.round(lastSuggest.score * 100) }}%
+          </header>
+          <pre class="suggest-comment">{{ lastSuggest.comment }}</pre>
+        </div>
+      </section>
+
+      <section v-if="session.selectedStudentId" class="row split code-row">
+        <article class="card pane">
+          <header class="card-head solution"><h3>📘 Solution</h3></header>
+          <div class="pane-body">
+            <NotebookViewer :cells="solutionCellsForQuestion"
+                            placeholder="No solution cells for this question." />
+          </div>
+        </article>
+        <article class="card pane">
+          <header class="card-head student">
+            <h3>📝 Student submission</h3>
+            <button class="btn btn-small" @click="loadStudentCodeIntoRunner">↓ Load to runner</button>
+          </header>
+          <div class="pane-body">
+            <NotebookViewer :cells="studentCellsForQuestion"
+                            placeholder="No student cells for this question." />
+          </div>
+        </article>
+      </section>
+
+      <section v-if="session.selectedStudentId" class="card runner">
+        <header class="card-head">
+          <h3>▶ Run code</h3>
+          <span class="card-meta muted">Runs as a Python subprocess (10s timeout)</span>
+        </header>
+        <textarea class="code-in" v-model="runnerCode" rows="12"
+                  placeholder="Paste or load the student's code here..." />
+        <div class="run-row">
+          <input class="stdin" v-model="runnerStdin" placeholder="Optional stdin" />
+          <button class="btn btn-primary" :disabled="runnerLoading" @click="onRun">
+            <span v-if="runnerLoading" class="spin" />
+            {{ runnerLoading ? 'Running…' : '▶ Run' }}
+          </button>
+          <span v-if="runnerResult" class="run-meta" :class="runnerResult.success ? 'ok' : 'err'">
+            {{ runnerResult.success ? '✓' : '✗' }} {{ runnerResult.duration_ms }}ms
+          </span>
+        </div>
+        <div v-if="runnerResult" class="run-out">
+          <div v-if="runnerResult.output">
+            <span class="lbl">Output</span>
+            <pre>{{ runnerResult.output }}</pre>
+          </div>
+          <div v-if="runnerResult.error">
+            <span class="lbl err">Error</span>
+            <pre class="err">{{ runnerResult.error }}</pre>
           </div>
         </div>
-      </template>
-    </section>
+      </section>
+    </main>
 
     <Transition name="toast">
       <div v-if="toast" class="toast" :class="toast.kind">{{ toast.text }}</div>
-    </Transition>
-
-    <Transition name="modal">
-      <div v-if="showRunner" class="modal-bg" @click.self="showRunner = false">
-        <div class="modal">
-          <header>
-            <h3>Run student code</h3>
-            <button class="ghost" @click="showRunner = false">✕</button>
-          </header>
-          <div class="modal-body">
-            <label class="label">Code</label>
-            <textarea v-model="runnerCode" rows="14" class="code-in" />
-            <label class="label">Stdin (optional)</label>
-            <textarea v-model="runnerStdin" rows="3" />
-            <div class="run-actions">
-              <button class="primary" :disabled="runnerLoading" @click="onRun">
-                {{ runnerLoading ? 'Running…' : '▶ Run' }}
-              </button>
-              <span v-if="runnerResult" class="meta">
-                {{ runnerResult.duration_ms }}ms ·
-                <span :class="runnerResult.success ? 'ok' : 'err'">
-                  {{ runnerResult.success ? 'success' : 'error' }}
-                </span>
-              </span>
-            </div>
-            <div v-if="runnerResult" class="run-out">
-              <div v-if="runnerResult.output">
-                <span class="label">Output</span>
-                <pre>{{ runnerResult.output }}</pre>
-              </div>
-              <div v-if="runnerResult.error">
-                <span class="label err">Error</span>
-                <pre class="err">{{ runnerResult.error }}</pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </Transition>
   </div>
 </template>
 
 <style scoped>
-.layout {
-  display: grid;
-  grid-template-columns: 280px 1fr 340px;
-  grid-template-rows: 56px 1fr;
-  grid-template-areas:
-    'topbar topbar topbar'
-    'sidebar main grading';
-  height: 100vh;
-  background: var(--bg-primary);
-  color: var(--text);
+.page {
+  min-height: 100vh;
+  background: var(--bg-page);
 }
 
-/* Topbar */
-.topbar {
-  grid-area: topbar;
+/* ---- App bar ---- */
+.appbar {
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 0.7rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--border-strong);
+  gap: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.topbar .left, .topbar .right { display: flex; gap: 0.6rem; align-items: center; }
-.topbar h1 { margin: 0; font-size: 1rem; color: var(--text-strong); }
-.topbar .meta { font-size: 0.8rem; color: #cbd5e1; }
-
-button.ghost {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  padding: 0.35rem 0.7rem;
-  border-radius: 4px;
-  font-size: 0.85rem;
-}
-button.ghost:hover { background: rgba(255,255,255,0.06); }
-
-a.primary, button.primary {
-  padding: 0.4rem 0.85rem;
-  border-radius: 4px;
-  background: var(--accent);
+.appbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
+.appbar .actions { display: flex; gap: 0.5rem; }
+.appbar .btn {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.25);
   color: white;
-  border: none;
-  font-size: 0.85rem;
-  text-decoration: none;
 }
-a.primary:hover, button.primary:hover { background: var(--accent-hover); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.appbar .btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+.appbar .btn-primary { background: var(--accent); border-color: var(--accent); }
+.appbar .btn-warn { background: var(--warning); border-color: var(--warning); color: white; }
+.appbar .btn-warn:hover:not(:disabled) { background: #b45309; border-color: #b45309; }
 
-/* Sidebar */
-.sidebar {
-  grid-area: sidebar;
-  border-right: 1px solid var(--border);
-  background: var(--bg-elevated);
-  overflow-y: auto;
-}
-.sidebar-controls {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.6rem 0.75rem 0.4rem;
-  font-size: 0.78rem;
-}
-.sidebar-controls .label { color: var(--text-muted); margin-right: 0.2rem; }
-.toggle {
-  background: var(--bg-panel);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  font-size: 0.78rem;
-}
-.toggle.active { background: var(--accent); border-color: var(--accent); color: white; }
-
-.nav-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.4rem 0.75rem 0.6rem;
+/* ---- Top nav ---- */
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--border);
 }
-.nav-row button {
-  background: var(--bg-panel);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 0.25rem 0.55rem;
-  font-size: 0.8rem;
-}
-.nav-row .pos { font-size: 0.8rem; color: var(--text-muted); font-family: ui-monospace, monospace; }
+.nav-btn { min-width: 100px; }
+.cur-student { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.cs-name { font-weight: 600; color: var(--text-strong); font-size: 0.95rem; }
+.cs-meta { font-size: 0.78rem; color: var(--text-muted); }
+.cs-meta code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.cs-meta.muted { font-style: italic; }
 
-.sidebar ul { list-style: none; margin: 0; padding: 0; }
-.sidebar li {
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-}
-.sidebar li:hover { background: rgba(255,255,255,0.04); }
-.sidebar li.active {
-  background: rgba(52, 152, 219, 0.18);
-  border-left: 3px solid var(--accent);
-  padding-left: calc(0.75rem - 3px);
-}
-.row1 { display: flex; align-items: center; gap: 0.4rem; }
-.row1 strong { font-size: 0.88rem; color: var(--text-strong); }
-.row2 { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
-.num { font-family: ui-monospace, monospace; }
-.grade { font-weight: 600; color: var(--text); }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-.graded .dot { background: var(--success); }
-.flagged .dot { background: var(--warning); }
-.err .dot { background: var(--danger); }
-.badge { font-size: 0.7rem; margin-top: 3px; padding: 2px 5px; border-radius: 3px; display: inline-block; }
-.badge.ai { background: rgba(243, 156, 18, 0.2); color: #fbbf24; }
-.err-msg { color: var(--danger); font-size: 0.72rem; margin-top: 3px; }
-
-/* Main */
-.main {
-  grid-area: main;
-  overflow-y: auto;
+/* ---- Body ---- */
+.body {
+  max-width: 1500px;
+  margin: 0 auto;
   padding: 1rem 1.25rem 2rem;
-}
-.error {
-  color: var(--danger);
-  background: rgba(231, 76, 60, 0.12);
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-}
-.placeholder { color: var(--text-muted); padding: 2rem; text-align: center; font-style: italic; }
-
-.student-head {
-  display: flex; justify-content: space-between; align-items: flex-end;
-  padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0.8rem;
-}
-.student-head h2 { margin: 0; font-size: 1.15rem; color: var(--text-strong); }
-.student-head h2 .num { font-size: 0.9rem; color: var(--text-muted); margin-left: 0.4rem; }
-.student-head .meta { font-size: 0.82rem; color: var(--text-muted); }
-.total { text-align: right; }
-.total .label { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.total strong { font-size: 1.4rem; color: var(--accent); }
-
-.warn {
-  background: rgba(243, 156, 18, 0.12);
-  border-left: 3px solid var(--warning);
-  padding: 0.55rem 0.75rem;
-  border-radius: 4px;
-  margin-bottom: 0.8rem;
-  font-size: 0.85rem;
-  color: #fbbf24;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
-.qbar {
-  display: flex; flex-wrap: wrap; gap: 0.4rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0.5rem;
-}
-.qbar button {
-  background: var(--bg-panel);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  padding: 0.3rem 0.65rem;
-  border-radius: 4px;
-  font-size: 0.82rem;
-  font-family: ui-monospace, monospace;
-}
-.qbar button.active { background: var(--accent); border-color: var(--accent); color: white; }
-.qbar .qpts { font-size: 0.7rem; opacity: 0.8; }
+.row.split { display: grid; grid-template-columns: 2fr 1fr; gap: 0.85rem; }
+.code-row { grid-template-columns: 1fr 1fr; }
 
-.qstatement {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  padding: 0.4rem 0.6rem;
-  background: var(--bg-elevated);
-  border-radius: 4px;
-  margin-bottom: 0.6rem;
-}
-
-.compare {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
-}
-.pane {
+.card {
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: hidden;
-  background: var(--bg-elevated);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-.pane > header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.4rem 0.7rem;
-  background: var(--bg-panel);
+.card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.55rem 0.9rem;
+  background: var(--bg-soft);
   border-bottom: 1px solid var(--border);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-muted);
 }
-.pane-body {
-  max-height: 540px;
-  overflow-y: auto;
-  padding: 0.5rem;
+.card-head h3 { margin: 0; font-size: 0.85rem; color: var(--text-strong); font-weight: 600; }
+.card-head.solution h3::before { content: ''; }
+.card-head .card-meta { font-size: 0.78rem; color: var(--text-muted); }
+.card-head .card-meta strong { color: var(--text-strong); }
+.muted { color: var(--text-muted); }
+
+/* selector card */
+.selector { padding: 0; }
+.selector .card-head { gap: 0.5rem; }
+.sort-toggle { display: flex; gap: 0.25rem; align-items: center; }
+.sort-toggle .lbl { font-size: 0.72rem; color: var(--text-muted); margin-right: 0.2rem; }
+.sort-toggle button {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  color: var(--text); padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.78rem;
 }
-.run-btn {
+.sort-toggle button.active { background: var(--accent); border-color: var(--accent); color: white; }
+.student-select {
+  width: calc(100% - 1.6rem);
+  margin: 0.7rem 0.8rem 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.92rem;
+  font-family: inherit;
+}
+.hint { color: var(--text-muted); font-size: 0.75rem; padding: 0 0.85rem 0.7rem; margin: 0; }
+.alert {
+  margin: 0 0.85rem 0.85rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+.alert.warn { background: var(--warning-soft); color: #92400e; border-left: 3px solid var(--warning); }
+
+/* summary card */
+.summary-list { list-style: none; margin: 0; padding: 0.5rem 0; }
+.summary-list li {
+  display: flex; justify-content: space-between;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  border-bottom: 1px dashed var(--border);
+}
+.summary-list li:last-child { border-bottom: none; }
+.summary-list .qid { color: var(--text-muted); font-family: ui-monospace, monospace; }
+.summary-list .qmax { color: var(--text-muted); }
+.summary-list li.done .qval { color: var(--success); font-weight: 600; }
+.summary-list li.total {
+  border-top: 1px solid var(--border-strong);
+  border-bottom: none;
+  background: var(--bg-soft);
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+}
+.summary-list li.total .qid { color: var(--text-strong); }
+.summary-list li.total .qval strong { color: var(--accent); font-size: 1.05rem; }
+
+/* questions */
+.qbar {
+  display: flex; flex-wrap: wrap; gap: 0.35rem;
+  padding: 0.7rem 0.9rem 0.4rem;
+}
+.qchip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.qchip:hover { background: var(--bg-soft); }
+.qchip-id { font-family: ui-monospace, monospace; font-weight: 600; }
+.qchip-pts { font-size: 0.72rem; color: var(--text-muted); }
+.qchip.graded { border-color: var(--success); }
+.qchip.graded .qchip-pts { color: var(--success); }
+.qchip.active {
   background: var(--accent);
+  border-color: var(--accent);
   color: white;
-  border: none;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.75rem;
-  border-radius: 3px;
+}
+.qchip.active .qchip-pts { color: rgba(255,255,255,0.85); }
+.qstatement {
+  margin: 0.3rem 0.9rem 0.85rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #1e3a5f;
 }
 
-/* Grading panel */
-.grading {
-  grid-area: grading;
-  border-left: 1px solid var(--border);
-  background: var(--bg-elevated);
-  overflow-y: auto;
-  padding: 0;
+/* grading */
+.grading { padding: 0; }
+.grading > * { margin: 0; }
+.grade-row {
+  display: flex; gap: 0.6rem; align-items: center;
+  padding: 0.85rem 0.9rem 0.55rem;
 }
-.grading > h2 {
-  margin: 0; padding: 0.7rem 0.85rem; font-size: 0.78rem;
-  text-transform: uppercase; letter-spacing: 0.6px;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-.questions { list-style: none; margin: 0; padding: 0; }
-.questions li {
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-}
-.questions li.active { background: rgba(52, 152, 219, 0.12); border-left: 3px solid var(--accent); padding-left: calc(0.75rem - 3px); }
-.qhead { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-strong); }
-.qmax { color: var(--text-muted); font-size: 0.78rem; }
-.qrow { display: flex; gap: 0.4rem; align-items: center; margin: 0.35rem 0; }
-.qrow input { flex: 1; padding: 0.28rem 0.5rem; font-family: ui-monospace, monospace; }
-.save { padding: 0.3rem 0.7rem !important; font-size: 0.8rem !important; }
-.quick { display: flex; gap: 0.2rem; margin-bottom: 0.3rem; }
-.quick button {
-  flex: 1; background: var(--bg-panel); color: var(--text);
+.grade-input {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: var(--bg-soft);
   border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  padding: 0.18rem 0; font-size: 0.72rem;
+  border-radius: 6px;
+  padding: 0 0.5rem 0 0;
 }
-.quick button:hover { background: var(--accent); border-color: var(--accent); color: white; }
-.questions textarea {
-  width: 100%; padding: 0.3rem 0.5rem;
-  font-size: 0.8rem; resize: vertical; min-height: 36px;
+.grade-input input {
+  width: 90px; padding: 0.45rem 0.55rem;
+  font-size: 1.1rem; font-weight: 600;
+  font-family: ui-monospace, monospace;
+  border: none; background: transparent;
+}
+.grade-input input:focus { box-shadow: none; }
+.grade-input .of { color: var(--text-muted); font-size: 0.9rem; }
+
+.btn-warn { background: var(--warning); border-color: var(--warning); color: white; }
+
+.quick-row {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0 0.9rem 0.6rem;
+}
+.quick-lbl { font-size: 0.75rem; color: var(--text-muted); margin-right: 0.4rem; }
+.btn.quick {
+  padding: 0.28rem 0.55rem; font-size: 0.78rem;
+  background: var(--bg-soft);
+}
+.btn.quick:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.comment {
+  display: block;
+  width: calc(100% - 1.8rem);
+  margin: 0 0.9rem 0.85rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.suggest-result {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+.suggest-result header { display: flex; align-items: center; gap: 0.55rem; font-size: 0.92rem; }
+.suggest-result .conf-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+}
+.conf-pill.high { background: var(--success-soft); color: #065f46; }
+.conf-pill.medium { background: var(--warning-soft); color: #92400e; }
+.conf-pill.low { background: var(--danger-soft); color: #991b1b; }
+.conf-pill.none { background: var(--border); color: var(--text-muted); }
+.suggest-comment {
+  margin: 0.5rem 0 0;
+  padding: 0.6rem 0.7rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.83rem;
+  color: var(--text);
+  white-space: pre-wrap;
   font-family: inherit;
 }
 
-.suggest-block { padding: 0.7rem 0.75rem; border-top: 1px solid var(--border); background: var(--bg-panel); }
-.suggest {
-  width: 100%;
-  background: var(--suggest); color: white;
-  border: none; padding: 0.45rem;
-  border-radius: 4px; font-size: 0.85rem; font-weight: 600;
+/* code panes */
+.pane { padding: 0; }
+.card-head.solution { background: #ebf5ff; border-bottom-color: #bfdbfe; }
+.card-head.solution h3 { color: #1e3a8a; }
+.card-head.student { background: #ecfdf5; border-bottom-color: #a7f3d0; }
+.card-head.student h3 { color: #14532d; }
+.btn-small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+.pane-body {
+  max-height: 540px;
+  overflow-y: auto;
+  padding: 0.55rem;
+  background: var(--bg-soft);
 }
-.suggest:disabled { opacity: 0.6; }
-.suggest-result {
-  margin-top: 0.5rem; padding: 0.4rem 0.55rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  background: rgba(255,255,255,0.04);
-  border-left: 3px solid var(--text-muted);
-}
-.suggest-result.high { border-left-color: var(--success); }
-.suggest-result.medium { border-left-color: var(--warning); }
-.suggest-result.low { border-left-color: var(--danger); }
-.suggest-result.none { color: var(--text-muted); }
 
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  padding: 0.6rem 0.9rem;
+/* runner */
+.runner { padding: 0; }
+.code-in {
+  display: block;
+  width: calc(100% - 1.6rem);
+  margin: 0.7rem 0.8rem 0.4rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+.run-row {
+  display: flex; gap: 0.5rem; align-items: center;
+  padding: 0 0.8rem 0.7rem;
+}
+.run-row .stdin {
+  flex: 1; padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+}
+.run-meta { font-size: 0.85rem; }
+.run-meta.ok { color: var(--success); }
+.run-meta.err { color: var(--danger); }
+.run-out { padding: 0 0.8rem 0.85rem; }
+.run-out .lbl {
+  display: inline-block;
+  font-size: 0.7rem; text-transform: uppercase;
+  color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 0.2rem;
+}
+.run-out .lbl.err { color: var(--danger); }
+.run-out pre {
+  margin: 0; padding: 0.55rem 0.7rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
+  font-family: ui-monospace, monospace; font-size: 0.82rem;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 240px; overflow: auto;
+}
+.run-out pre.err { border-color: var(--danger); background: var(--danger-soft); color: #991b1b; }
+
+/* spinner */
+.spin {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* toast */
+.toast {
+  position: fixed; bottom: 18px; right: 18px;
+  padding: 0.6rem 0.95rem;
+  border-radius: 6px;
   background: var(--success); color: white;
   z-index: 100; font-size: 0.85rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
 }
 .toast.err { background: var(--danger); }
 .toast-enter-from, .toast-leave-to { transform: translateX(120%); opacity: 0; }
 .toast-enter-active, .toast-leave-active { transition: all 0.25s ease; }
 
-/* Modal (Run code) */
-.modal-bg {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 50;
-}
-.modal {
-  background: var(--bg-elevated);
-  width: min(800px, 92vw);
-  max-height: 90vh;
-  border-radius: 8px;
-  border: 1px solid var(--border-strong);
-  display: flex; flex-direction: column;
-  overflow: hidden;
-}
-.modal > header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.6rem 0.9rem;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--border);
-}
-.modal > header h3 { margin: 0; font-size: 0.95rem; color: var(--text-strong); }
-.modal-body { padding: 0.8rem; overflow-y: auto; }
-.modal-body .label { display: block; font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; margin-top: 0.4rem; }
-.code-in {
-  width: 100%; font-family: ui-monospace, monospace; font-size: 0.85rem;
-  background: var(--code-bg); color: var(--text);
-}
-.modal-body textarea { width: 100%; padding: 0.4rem 0.55rem; }
-.run-actions { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.6rem; }
-.run-actions .meta { color: var(--text-muted); font-size: 0.82rem; }
-.run-actions .ok { color: var(--success); }
-.run-actions .err { color: var(--danger); }
-.run-out { margin-top: 0.7rem; }
-.run-out pre {
-  margin: 0; padding: 0.5rem 0.7rem;
-  background: var(--code-bg); border-radius: 4px;
-  font-family: ui-monospace, monospace; font-size: 0.82rem;
-  white-space: pre-wrap; word-break: break-word;
-  color: var(--text);
-}
-.run-out pre.err { color: #fca5a5; border-left: 3px solid var(--danger); }
-.run-out .label.err { color: #fca5a5; }
-
-.modal-enter-from, .modal-leave-to { opacity: 0; }
-.modal-enter-active, .modal-leave-active { transition: opacity 0.18s; }
-
-@media (max-width: 1200px) {
-  .layout { grid-template-columns: 240px 1fr 300px; }
-  .compare { grid-template-columns: 1fr; }
+@media (max-width: 1100px) {
+  .row.split { grid-template-columns: 1fr; }
+  .code-row { grid-template-columns: 1fr; }
 }
 </style>
