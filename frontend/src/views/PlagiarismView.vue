@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 import { plagiarismAnalyze, plagiarismCompare } from '../api/client'
 import type { PlagiarismAnalyzeResponse, PlagiarismCompareResponse } from '../api/client'
@@ -19,6 +19,8 @@ const compareLoading = ref(false)
 const compareResult = ref<PlagiarismCompareResponse | null>(null)
 
 let elapsedTimer: number | null = null
+let analyzeController: AbortController | null = null
+let compareController: AbortController | null = null
 
 const studentCount = computed(() => session.students.length)
 const estComparisons = computed(() => {
@@ -26,6 +28,23 @@ const estComparisons = computed(() => {
   return n < 2 ? 0 : (n * (n - 1)) / 2
 })
 const filteredPairs = computed(() => result.value?.suspicious_pairs ?? [])
+
+function cleanup() {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer)
+    elapsedTimer = null
+  }
+  if (analyzeController) {
+    analyzeController.abort()
+    analyzeController = null
+  }
+  if (compareController) {
+    compareController.abort()
+    compareController = null
+  }
+  loading.value = false
+  compareLoading.value = false
+}
 
 onMounted(async () => {
   if (!session.students.length) {
@@ -37,8 +56,17 @@ onMounted(async () => {
   }
 })
 
+onBeforeRouteLeave(() => {
+  cleanup()
+})
+
+onBeforeUnmount(() => {
+  cleanup()
+})
+
 async function analyze() {
   if (loading.value) return
+  cleanup()
   loading.value = true
   error.value = null
   result.value = null
@@ -47,28 +75,35 @@ async function analyze() {
   elapsedTimer = window.setInterval(() => {
     if (startedAt.value) elapsed.value = (Date.now() - startedAt.value) / 1000
   }, 100)
+  analyzeController = new AbortController()
   try {
-    result.value = await plagiarismAnalyze(threshold.value)
+    result.value = await plagiarismAnalyze(threshold.value, analyzeController.signal)
   } catch (e) {
+    if ((e as Error).name === 'AbortError') return
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
-    loading.value = false
     if (elapsedTimer) {
       clearInterval(elapsedTimer)
       elapsedTimer = null
     }
+    loading.value = false
+    analyzeController = null
   }
 }
 
 async function openCompare(s1: string, s2: string) {
+  if (compareController) compareController.abort()
   compareLoading.value = true
   compareResult.value = null
+  compareController = new AbortController()
   try {
-    compareResult.value = await plagiarismCompare(s1, s2)
+    compareResult.value = await plagiarismCompare(s1, s2, compareController.signal)
   } catch (e) {
+    if ((e as Error).name === 'AbortError') return
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     compareLoading.value = false
+    compareController = null
   }
 }
 

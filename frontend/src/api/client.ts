@@ -214,11 +214,15 @@ export async function runCode(code: string, stdin = ''): Promise<RunCodeResponse
   return jsonOrThrow<RunCodeResponse>(res)
 }
 
-export async function plagiarismAnalyze(threshold: number): Promise<PlagiarismAnalyzeResponse> {
+export async function plagiarismAnalyze(
+  threshold: number,
+  signal?: AbortSignal,
+): Promise<PlagiarismAnalyzeResponse> {
   const res = await fetch('/api/plagiarism/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ threshold }),
+    signal,
   })
   return jsonOrThrow<PlagiarismAnalyzeResponse>(res)
 }
@@ -226,11 +230,13 @@ export async function plagiarismAnalyze(threshold: number): Promise<PlagiarismAn
 export async function plagiarismCompare(
   student1_id: string,
   student2_id: string,
+  signal?: AbortSignal,
 ): Promise<PlagiarismCompareResponse> {
   const res = await fetch('/api/plagiarism/compare', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ student1_id, student2_id }),
+    signal,
   })
   return jsonOrThrow<PlagiarismCompareResponse>(res)
 }
