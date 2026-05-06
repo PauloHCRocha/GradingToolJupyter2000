@@ -137,7 +137,13 @@ function syncDraft() {
   }
 }
 
+// Run once synchronously so the template never reads draft[id] before it's
+// initialized (e.g. when returning from another route with a student already
+// selected from a prior visit).
+syncDraft()
+
 watch(() => session.selectedStudentId, syncDraft)
+watch(() => session.questions.map((q) => q.id).join(','), syncDraft)
 
 function showToast(kind: 'ok' | 'err', text: string) {
   toast.value = { kind, text }
@@ -320,7 +326,7 @@ function gradeFor(qid: string): number | null {
         </p>
       </section>
 
-      <section v-if="selectedQuestion && session.selectedStudentId" class="card grading">
+      <section v-if="selectedQuestion && session.selectedStudentId && draft[selectedQuestion.id]" class="card grading">
         <header class="card-head">
           <h3>Grade · {{ selectedQuestion.label }}</h3>
           <span class="card-meta">Max: <strong>{{ selectedQuestionMax }}</strong></span>
