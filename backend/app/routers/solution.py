@@ -1,5 +1,6 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from app.core import state
 from app.core.question_detector import detect
 from app.models.schemas import DetectedQuestion, SolutionAnalysis
 
@@ -41,9 +42,18 @@ async def analyze_solution(file: UploadFile = File(...)) -> SolutionAnalysis:
         for h in hits
     ]
 
+    state.set_questions([q.model_dump() for q in questions])
+
     return SolutionAnalysis(
         filename=file.filename,
         file_type=file_type,  # type: ignore[arg-type]
         questions=questions,
         total_max_points=sum(q.max_points for q in questions),
     )
+
+
+@router.put("/questions", response_model=list[DetectedQuestion])
+def update_questions(questions: list[DetectedQuestion]) -> list[DetectedQuestion]:
+    """Persist user-edited question metadata (e.g. adjusted max_points)."""
+    state.set_questions([q.model_dump() for q in questions])
+    return questions
