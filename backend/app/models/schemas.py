@@ -16,6 +16,21 @@ class SolutionAnalysis(BaseModel):
     file_type: Literal["ipynb", "py"]
     questions: list[DetectedQuestion]
     total_max_points: float
+    question_windows: dict[str, list[int]] = {}
+
+
+class CellOut(BaseModel):
+    cell_id: str
+    cell_type: str
+    source: str
+    output: str
+
+
+class SolutionDetail(BaseModel):
+    filename: str
+    file_type: Literal["ipynb", "py"]
+    cells: list[CellOut]
+    question_windows: dict[str, list[int]] = {}
 
 
 class StudentInfo(BaseModel):
@@ -26,18 +41,14 @@ class StudentInfo(BaseModel):
     has_error: bool
     error: str | None = None
     total_grade: float = 0.0
-
-
-class CellOut(BaseModel):
-    cell_id: str
-    cell_type: str
-    source: str
-    output: str
+    invisible_count: int = 0
 
 
 class StudentDetail(BaseModel):
     info: StudentInfo
     cells: list[CellOut]
+    question_windows: dict[str, list[int]] = {}
+    invisible_findings: list[dict] = []
 
 
 class SubmissionsUploadResult(BaseModel):
@@ -58,3 +69,72 @@ class StudentGrades(BaseModel):
     student_id: str
     entries: list[GradeOut]
     total: float
+
+
+class SuggestRequest(BaseModel):
+    question_id: str
+
+
+class SuggestResponse(BaseModel):
+    points: float | None
+    score: float
+    confidence: Literal["high", "medium", "low", "none"]
+    comment: str
+    max_points: float
+
+
+class RunCodeRequest(BaseModel):
+    code: str
+    stdin: str = ""
+    timeout: float = 10.0
+
+
+class RunCodeResponse(BaseModel):
+    success: bool
+    output: str
+    error: str
+    duration_ms: int
+
+
+class PlagiarismAnalyzeRequest(BaseModel):
+    threshold: float = 0.85
+
+
+class SuspiciousPair(BaseModel):
+    student1_id: str
+    student1_name: str
+    student2_id: str
+    student2_name: str
+    similarity: float
+
+
+class PlagiarismAnalyzeResponse(BaseModel):
+    threshold: float
+    matrix: list[list[float]]
+    student_ids: list[str]
+    student_names: list[str]
+    suspicious_pairs: list[SuspiciousPair]
+    stats: dict
+
+
+class PlagiarismCompareRequest(BaseModel):
+    student1_id: str
+    student2_id: str
+
+
+class QuestionSimilarity(BaseModel):
+    question_id: str
+    similarity: float
+    tfidf: float
+    ast: float
+
+
+class PlagiarismCompareResponse(BaseModel):
+    student1_id: str
+    student1_name: str
+    student2_id: str
+    student2_name: str
+    overall_similarity: float
+    questions: list[QuestionSimilarity]
+    code1: str
+    code2: str
