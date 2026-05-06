@@ -87,6 +87,24 @@ import api
  *   Object.fromEntries` so dicts come back as plain JS objects all the way
  *   down.
  */
+/**
+ * Convert JS args to Python-friendly proxies before calling.
+ *
+ * Pyodide auto-converts primitives (string, number, bool) but TypedArrays
+ * arrive on the Python side as a JsProxy unless we toPy() them first —
+ * `json.loads` and `zipfile.ZipFile` choke on JsProxy. Plain JS objects/
+ * arrays must also be converted explicitly so Python sees real dicts/lists.
+ */
+function convertArg(pyodide: PyodideInterface, arg: unknown): unknown {
+  if (arg instanceof Uint8Array || arg instanceof ArrayBuffer) {
+    return pyodide.toPy(arg)
+  }
+  if (Array.isArray(arg) || (arg !== null && typeof arg === 'object')) {
+    return pyodide.toPy(arg)
+  }
+  return arg
+}
+
 export async function callApi<T = unknown>(funcName: string, ...args: unknown[]): Promise<T> {
   const pyodide = await getPyodide()
   const api = pyodide.pyimport('api')
@@ -95,17 +113,27 @@ export async function callApi<T = unknown>(funcName: string, ...args: unknown[])
     api.destroy?.()
     throw new Error(`Unknown API function: ${funcName}`)
   }
+
+  const converted = args.map((a) => convertArg(pyodide, a))
+  const toDestroy: Array<{ destroy?: () => void }> = []
+  for (const c of converted) {
+    if (c && typeof (c as { destroy?: () => void }).destroy === 'function') {
+      toDestroy.push(c as { destroy?: () => void })
+    }
+  }
+
   let result: unknown
   try {
-    result = fn(...args)
+    result = fn(...converted)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    // Pyodide PythonError messages include a long traceback; just keep the last line.
     const lastLine = msg.split('\n').filter((l) => l.trim()).pop() ?? msg
     throw new Error(lastLine)
   } finally {
     api.destroy?.()
+    for (const p of toDestroy) p.destroy?.()
   }
+
   if (result && typeof (result as { toJs?: () => unknown }).toJs === 'function') {
     const proxy = result as { toJs: (opts: object) => unknown; destroy: () => void }
     const js = proxy.toJs({ dict_converter: Object.fromEntries })

@@ -37,8 +37,8 @@ def _student_from_path(path: str):
 
 
 def _to_bytes(content) -> bytes:
-    if isinstance(content, (bytes, bytearray, memoryview)):
-        return bytes(content)
+    if hasattr(content, "to_py") and not isinstance(content, (bytes, bytearray, memoryview, str)):
+        content = content.to_py()
     if isinstance(content, str):
         return content.encode("utf-8")
     return bytes(content)

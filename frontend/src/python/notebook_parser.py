@@ -19,9 +19,12 @@ def _join(value):
 
 
 def _to_str(content):
-    if isinstance(content, (bytes, bytearray, memoryview)):
-        return bytes(content).decode("utf-8", errors="replace")
-    return content
+    # Pyodide may hand us a JsProxy wrapping a TypedArray; unwrap it first.
+    if hasattr(content, "to_py") and not isinstance(content, (bytes, bytearray, memoryview, str)):
+        content = content.to_py()
+    if isinstance(content, str):
+        return content
+    return bytes(content).decode("utf-8", errors="replace")
 
 
 def parse_notebook(content) -> list[Cell]:

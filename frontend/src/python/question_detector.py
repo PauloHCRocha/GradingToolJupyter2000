@@ -22,9 +22,11 @@ class Hit:
 
 
 def _to_str(content):
-    if isinstance(content, (bytes, bytearray, memoryview)):
-        return bytes(content).decode("utf-8", errors="replace")
-    return content
+    if hasattr(content, "to_py") and not isinstance(content, (bytes, bytearray, memoryview, str)):
+        content = content.to_py()
+    if isinstance(content, str):
+        return content
+    return bytes(content).decode("utf-8", errors="replace")
 
 
 def _extract_points(text: str):
