@@ -1129,6 +1129,9 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.7rem;
+  /* Each <details> sizes itself; the adjacent cell shouldn't stretch to
+     match an open row, otherwise it looks like both opened together. */
+  align-items: start;
 }
 .faq details {
   background: var(--bg-page);
