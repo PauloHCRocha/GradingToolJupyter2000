@@ -34,6 +34,13 @@ export const useSessionStore = defineStore('session', () => {
 
   const ready = computed(() => questions.value.length > 0 && students.value.length > 0)
 
+  // Only the questions the teacher chose to grade. Used everywhere the UI
+  // displays question lists / chips / totals — the backend already filters
+  // CSV export and per-question plagiarism similarity by the same flag.
+  const enabledQuestions = computed(() =>
+    questions.value.filter((q) => q.enabled !== false),
+  )
+
   const currentStudent = computed(() =>
     selectedStudentId.value ? students.value.find((s) => s.id === selectedStudentId.value) : null,
   )
@@ -45,7 +52,9 @@ export const useSessionStore = defineStore('session', () => {
 
   function setSolution(analysis: SolutionAnalysis) {
     solution.value = analysis
-    questions.value = analysis.questions.map((q) => ({ ...q }))
+    // Default `enabled` to true if the backend ever sends a question without
+    // it (defensive — avoids hiding all questions on schema mismatch).
+    questions.value = analysis.questions.map((q) => ({ ...q, enabled: q.enabled !== false }))
     if (questions.value.length && !selectedQuestionId.value) {
       selectedQuestionId.value = questions.value[0].id
     }
@@ -54,6 +63,29 @@ export const useSessionStore = defineStore('session', () => {
   function updateMaxPoints(id: string, max_points: number) {
     const q = questions.value.find((x) => x.id === id)
     if (q) q.max_points = max_points
+  }
+
+  function toggleQuestion(id: string, enabled: boolean) {
+    const q = questions.value.find((x) => x.id === id)
+    if (!q) return
+    q.enabled = enabled
+    // If the currently selected question got disabled, jump to the first
+    // remaining enabled one (or null when none are left).
+    if (!enabled && selectedQuestionId.value === id) {
+      const next = enabledQuestions.value[0]
+      selectedQuestionId.value = next ? next.id : null
+    } else if (enabled && !selectedQuestionId.value) {
+      selectedQuestionId.value = id
+    }
+  }
+
+  function setAllQuestionsEnabled(enabled: boolean) {
+    for (const q of questions.value) q.enabled = enabled
+    if (!enabled) {
+      selectedQuestionId.value = null
+    } else if (!selectedQuestionId.value && questions.value.length) {
+      selectedQuestionId.value = questions.value[0].id
+    }
   }
 
   async function commitQuestions() {
@@ -105,9 +137,14 @@ export const useSessionStore = defineStore('session', () => {
     studentDetail.value = detail
     studentGrades.value = Object.fromEntries(grades.entries.map((e) => [e.question_id, e]))
     patchStudentTotal(studentId, grades.total)
-    if (!selectedQuestionId.value && questions.value.length) {
-      selectedQuestionId.value = questions.value[0].id
-    }
+    ensureValidSelectedQuestion()
+  }
+
+  function ensureValidSelectedQuestion() {
+    const enabled = enabledQuestions.value
+    const current = selectedQuestionId.value
+    if (current && enabled.some((q) => q.id === current)) return
+    selectedQuestionId.value = enabled[0]?.id ?? null
   }
 
   function selectQuestion(qid: string) {
@@ -147,15 +184,19 @@ export const useSessionStore = defineStore('session', () => {
     studentDetail,
     studentGrades,
     ready,
+    enabledQuestions,
     currentStudent,
     currentIndex,
     setSolution,
     updateMaxPoints,
+    toggleQuestion,
+    setAllQuestionsEnabled,
     commitQuestions,
     setStudents,
     refreshStudents,
     setSortOrder,
     ensureSolutionDetail,
+    ensureValidSelectedQuestion,
     selectStudent,
     selectQuestion,
     navigate,

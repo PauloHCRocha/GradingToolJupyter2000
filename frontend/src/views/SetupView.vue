@@ -15,12 +15,21 @@ const continuing = ref(false)
 const errorSolution = ref<string | null>(null)
 const errorSubmissions = ref<string | null>(null)
 
+// Totals reflect what will *actually* be graded (enabled questions only) so
+// the "X points total" pill matches what students see at grading time.
 const totalMax = computed(() =>
-  session.questions.reduce((acc, q) => acc + (Number(q.max_points) || 0), 0),
+  session.enabledQuestions.reduce((acc, q) => acc + (Number(q.max_points) || 0), 0),
+)
+const enabledCount = computed(() => session.enabledQuestions.length)
+const allEnabled = computed(
+  () => session.questions.length > 0 && session.questions.every((q) => q.enabled),
+)
+const noneEnabled = computed(
+  () => session.questions.length > 0 && session.questions.every((q) => !q.enabled),
 )
 
 const canContinue = computed(
-  () => session.questions.length > 0 && session.students.length > 0,
+  () => session.enabledQuestions.length > 0 && session.students.length > 0,
 )
 
 function pickSolution(e: Event) {
@@ -118,22 +127,61 @@ async function onContinue() {
             <div class="result-meta">
               <span><strong>{{ session.solution.filename }}</strong></span>
               <span class="pill type">{{ session.solution.file_type }}</span>
-              <span class="pill">{{ session.questions.length }} question(s)</span>
+              <span class="pill">
+                <strong>{{ enabledCount }}</strong> of {{ session.questions.length }} to grade
+              </span>
               <span class="pill total">{{ totalMax }} points total</span>
+            </div>
+            <div class="bulk-toggle">
+              <button class="btn btn-link"
+                      :disabled="allEnabled"
+                      @click="session.setAllQuestionsEnabled(true)">
+                Select all
+              </button>
+              <span class="sep">·</span>
+              <button class="btn btn-link"
+                      :disabled="noneEnabled"
+                      @click="session.setAllQuestionsEnabled(false)">
+                Select none
+              </button>
+              <span class="bulk-hint">
+                Untick a row to skip that question — it won't appear in grading,
+                CSV export or per-question plagiarism analysis.
+              </span>
             </div>
             <div class="qtable-wrap">
               <table class="qtable">
                 <thead>
-                  <tr><th>ID</th><th>Label</th><th class="num-col">Max points</th><th>Statement</th></tr>
+                  <tr>
+                    <th class="check-col">Grade</th>
+                    <th>ID</th>
+                    <th>Label</th>
+                    <th class="num-col">Max points</th>
+                    <th>Statement</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="q in session.questions" :key="q.id">
+                  <tr
+                    v-for="q in session.questions"
+                    :key="q.id"
+                    :class="{ skipped: !q.enabled }"
+                  >
+                    <td class="check-col">
+                      <input
+                        type="checkbox"
+                        class="grade-check"
+                        :checked="q.enabled"
+                        @change="(e) => session.toggleQuestion(q.id, (e.target as HTMLInputElement).checked)"
+                        :aria-label="`Grade ${q.id}`"
+                      />
+                    </td>
                     <td><code class="qcode">{{ q.id }}</code></td>
                     <td>{{ q.label }}</td>
                     <td class="num-col">
                       <input class="pts-input"
                         type="number" step="0.5" min="0"
                         :value="q.max_points"
+                        :disabled="!q.enabled"
                         @input="(e) => session.updateMaxPoints(q.id, Number((e.target as HTMLInputElement).value))"
                       />
                     </td>
@@ -355,7 +403,44 @@ async function onContinue() {
   border-radius: 8px;
   overflow: hidden;
 }
+.bulk-toggle {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin: 0.4rem 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  padding: 0.15rem 0.3rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.btn-link:hover:not(:disabled) { text-decoration: underline; }
+.btn-link:disabled { color: var(--text-muted); cursor: default; }
+.bulk-toggle .sep { color: var(--text-muted); }
+.bulk-hint { color: var(--text-muted); }
+
 .qtable { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.qtable .check-col { width: 50px; text-align: center; }
+.grade-check {
+  width: 16px; height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.qtable tr.skipped {
+  background: var(--bg-soft);
+  opacity: 0.55;
+}
+.qtable tr.skipped .qcode {
+  background: var(--bg-soft);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.qtable tr.skipped .pts-input { color: var(--text-muted); }
+
 .qtable th {
   background: var(--bg-soft);
   padding: 0.5rem 0.7rem;

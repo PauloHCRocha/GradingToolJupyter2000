@@ -52,16 +52,23 @@ function startSplitDrag(e: MouseEvent) {
   window.addEventListener('mouseup', onUp)
 }
 
+// Totals and chips reflect what the teacher actually wants to grade — all
+// of these use enabledQuestions, so deselected ones disappear from the UI
+// while their saved grades stay intact in case the teacher re-enables them.
 const totalMax = computed(() =>
-  session.questions.reduce((acc, q) => acc + (Number(q.max_points) || 0), 0),
+  session.enabledQuestions.reduce((acc, q) => acc + (Number(q.max_points) || 0), 0),
 )
-const totalCurrent = computed(() =>
-  Object.values(session.studentGrades).reduce((acc, g) => acc + (g?.points ?? 0), 0),
-)
+const totalCurrent = computed(() => {
+  const enabledIds = new Set(session.enabledQuestions.map((q) => q.id))
+  return Object.values(session.studentGrades).reduce(
+    (acc, g) => (g && enabledIds.has(g.question_id) ? acc + (g.points ?? 0) : acc),
+    0,
+  )
+})
 const gradedCount = computed(() => session.students.filter((s) => s.total_grade > 0).length)
 
 const selectedQuestion = computed(() =>
-  session.questions.find((q) => q.id === session.selectedQuestionId) ?? null,
+  session.enabledQuestions.find((q) => q.id === session.selectedQuestionId) ?? null,
 )
 
 const selectedQuestionMax = computed(() =>
@@ -110,10 +117,13 @@ watch(
 )
 
 onMounted(async () => {
-  if (!session.questions.length || !session.students.length) {
+  if (!session.enabledQuestions.length || !session.students.length) {
     router.replace('/setup')
     return
   }
+  // Cover the "user disabled the previously selected question and came back
+  // to grading" case — store helper picks first enabled.
+  session.ensureValidSelectedQuestion()
   await session.ensureSolutionDetail()
   if (!session.selectedStudentId) {
     const first = session.students.find((s) => !s.has_error)
@@ -264,7 +274,8 @@ function gradeFor(qid: string): number | null {
         <h1>📋 Assignment Grading Tool</h1>
         <span class="meta">
           {{ session.students.length }} students · {{ gradedCount }} graded ·
-          {{ session.questions.length }} questions ({{ totalMax }} pts total)
+          {{ session.enabledQuestions.length }}<template v-if="session.questions.length !== session.enabledQuestions.length">/{{ session.questions.length }}</template>
+          questions ({{ totalMax }} pts total)
         </span>
       </div>
       <div class="actions">
@@ -321,7 +332,7 @@ function gradeFor(qid: string): number | null {
         <article class="card summary">
           <header class="card-head"><h3>Grade summary</h3></header>
           <ul class="summary-list">
-            <li v-for="q in session.questions" :key="q.id"
+            <li v-for="q in session.enabledQuestions" :key="q.id"
                 :class="{ done: gradeFor(q.id) !== null && (gradeFor(q.id) ?? 0) > 0 }">
               <span class="qid">{{ q.id }}</span>
               <span class="qval">
@@ -343,13 +354,16 @@ function gradeFor(qid: string): number | null {
       <section class="card questions">
         <header class="card-head"><h3>Questions</h3></header>
         <div class="qbar">
-          <button v-for="q in session.questions" :key="q.id"
+          <button v-for="q in session.enabledQuestions" :key="q.id"
                   class="qchip"
                   :class="{ active: q.id === session.selectedQuestionId, graded: (gradeFor(q.id) ?? 0) > 0 }"
                   @click="session.selectQuestion(q.id)">
             <span class="qchip-id">{{ q.id }}</span>
             <span class="qchip-pts">{{ q.max_points }}pt</span>
           </button>
+          <p v-if="!session.enabledQuestions.length" class="hint">
+            No questions selected for grading. Re-enable some in Setup.
+          </p>
         </div>
         <p v-if="selectedQuestion" class="qstatement">
           {{ selectedQuestion.statement.slice(0, 360) }}{{ selectedQuestion.statement.length > 360 ? '…' : '' }}

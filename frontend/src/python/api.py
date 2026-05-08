@@ -19,9 +19,18 @@ import state
 import submission_loader
 
 
+def _enabled_question_ids() -> set[str]:
+    return {q["id"] for q in state.get_questions() if q.get("enabled", True)}
+
+
+def _enabled_questions() -> list[dict]:
+    return [q for q in state.get_questions() if q.get("enabled", True)]
+
+
 def _student_info(rec):
     grades = state.get_grades(rec.id)
-    total = sum(g.points for g in grades.values())
+    enabled = _enabled_question_ids()
+    total = sum(g.points for qid, g in grades.items() if qid in enabled)
     return {
         "id": rec.id,
         "name": rec.name,
@@ -57,6 +66,10 @@ def analyze_solution(content, filename):
             "max_points": h.points if h.points is not None else 0.0,
             "statement": h.statement,
             "cell_indices": list(h.cell_indices),
+            # All questions are graded by default; the user can opt some out
+            # in the setup screen and the toggle propagates through totals,
+            # CSV export and plagiarism per-question similarity.
+            "enabled": True,
         }
         for h in hits
     ]
@@ -66,13 +79,19 @@ def analyze_solution(content, filename):
         "filename": filename,
         "file_type": file_type,
         "questions": questions,
-        "total_max_points": sum(q["max_points"] for q in questions),
+        "total_max_points": sum(q["max_points"] for q in questions if q.get("enabled", True)),
         "question_windows": windows,
     }
 
 
 def update_questions(questions):
-    qs = [dict(q) for q in questions]
+    # Coerce each entry into a clean dict with a default enabled=True so old
+    # callers that don't send the field still produce well-formed state.
+    qs = []
+    for q in questions:
+        d = dict(q)
+        d.setdefault("enabled", True)
+        qs.append(d)
     state.set_questions(qs)
     return qs
 
@@ -313,7 +332,7 @@ def plagiarism_compare(student1_id, student2_id):
     code1 = plagiarism.extract_code(s1.cells)
     code2 = plagiarism.extract_code(s2.cells)
 
-    questions = state.get_questions()
+    questions = _enabled_questions()
     q_results = []
     for q in questions:
         qid = q["id"]
@@ -361,7 +380,8 @@ def plagiarism_compare(student1_id, student2_id):
 
 
 def export_grades_csv():
-    questions = state.get_questions()
+    # Only the questions the teacher chose to grade end up in the CSV.
+    questions = _enabled_questions()
     qids = [q["id"] for q in questions]
 
     buf = io.StringIO()

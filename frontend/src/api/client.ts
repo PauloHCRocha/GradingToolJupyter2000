@@ -12,6 +12,7 @@ export interface DetectedQuestion {
   max_points: number
   statement: string
   cell_indices: number[]
+  enabled: boolean
 }
 
 export interface SolutionAnalysis {
@@ -197,6 +198,7 @@ export async function updateQuestions(questions: DetectedQuestion[]): Promise<De
     max_points: q.max_points,
     statement: q.statement,
     cell_indices: [...q.cell_indices],
+    enabled: q.enabled !== false,
   }))
   return callApi<DetectedQuestion[]>('update_questions', plain)
 }
