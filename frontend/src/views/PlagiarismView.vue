@@ -252,8 +252,8 @@ async function exportFullReport() {
   <div class="page">
     <header class="appbar">
       <RouterLink to="/" class="title" title="Back to landing">
-        <h1>⚠ Plagiarism detection</h1>
-        <span class="meta">{{ studentCount }} students loaded</span>
+        <h1>🪐 Ganymede</h1>
+        <span class="meta">Plagiarism · {{ studentCount }} students loaded</span>
       </RouterLink>
       <div class="actions">
         <button class="btn" @click="router.push('/grading')">← Back to grading</button>

@@ -273,8 +273,9 @@ function gradeFor(qid: string): number | null {
   <div class="page">
     <header class="appbar">
       <RouterLink to="/" class="title" title="Back to landing">
-        <h1>📋 Assignment Grading Tool</h1>
+        <h1>🪐 Ganymede</h1>
         <span class="meta">
+          Grading ·
           {{ session.students.length }} students · {{ gradedCount }} graded ·
           {{ session.enabledQuestions.length }}<template v-if="session.questions.length !== session.enabledQuestions.length">/{{ session.questions.length }}</template>
           questions ({{ totalMax }} pts total)

@@ -1,4 +1,6 @@
-# GradingToolJupyter2000
+# Ganymede
+
+> Repo name `GradingToolJupyter2000` is the legacy slug; the product brand is **Ganymede**.
 
 Web app for grading Jupyter (`.ipynb`) and Python (`.py`) student submissions —
 runs **entirely in the browser**. Student files never leave the teacher's machine.
