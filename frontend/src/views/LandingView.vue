@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { runtimeStage } from '../runtime/pyodide'
+import LandingIcon from '../components/LandingIcon.vue'
 
 const router = useRouter()
 
@@ -289,32 +290,32 @@ onBeforeUnmount(() => {
       </header>
       <div class="grid">
         <article>
-          <div class="ico">🔒</div>
+          <div class="ico"><LandingIcon name="privacy" /></div>
           <h3>Privacy by design</h3>
           <p>There's no backend. Student files are read in the browser and stay there. Closing the tab clears everything.</p>
         </article>
         <article>
-          <div class="ico">🔍</div>
+          <div class="ico"><LandingIcon name="detect" /></div>
           <h3>Dynamic question detection</h3>
           <p>Drop your solution and the questions, sub-questions and points are extracted from the markdown automatically.</p>
         </article>
         <article>
-          <div class="ico">⚖️</div>
+          <div class="ico"><LandingIcon name="scale" /></div>
           <h3>AI-free grade suggestions</h3>
           <p>A transparent multi-criteria heuristic compares student code with your reference — imports, structures, output, and completeness.</p>
         </article>
         <article>
-          <div class="ico">🛡️</div>
+          <div class="ico"><LandingIcon name="shield" /></div>
           <h3>Plagiarism detection</h3>
           <p>Hybrid similarity (TF-IDF + AST + token Jaccard) surfaces suspicious pairs, clusters and a full similarity matrix.</p>
         </article>
         <article>
-          <div class="ico">▶️</div>
+          <div class="ico"><LandingIcon name="play" /></div>
           <h3>Run student code safely</h3>
           <p>Execute submissions inside the browser sandbox. No subprocess on a server, no risk to your machine.</p>
         </article>
         <article>
-          <div class="ico">📋</div>
+          <div class="ico"><LandingIcon name="split" /></div>
           <h3>Side-by-side review</h3>
           <p>Your reference and the student's notebook are shown next to each other — drag the splitter to give either side more room.</p>
         </article>
@@ -353,17 +354,17 @@ onBeforeUnmount(() => {
       </header>
       <div class="personas">
         <article>
-          <div class="ico">🎓</div>
+          <div class="ico"><LandingIcon name="cap" /></div>
           <h3>University professors</h3>
           <p>Got a class of 80 Jupyter notebooks every assignment? Don't ship them through someone else's cloud. Run the whole grading workflow in your laptop's browser.</p>
         </article>
         <article>
-          <div class="ico">⚡</div>
+          <div class="ico"><LandingIcon name="bolt" /></div>
           <h3>Bootcamp instructors</h3>
           <p>Tight turnarounds, lots of submissions. The dynamic question detector and the multi-criteria suggester get you 60% of the grade in 0% of the time.</p>
         </article>
         <article>
-          <div class="ico">🛡️</div>
+          <div class="ico"><LandingIcon name="users" /></div>
           <h3>Teaching assistants</h3>
           <p>You probably can't put student data on a third-party SaaS even if you wanted to. With this tool you don't have to ask — files literally cannot leave your machine.</p>
         </article>
@@ -1048,13 +1049,20 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 .features article .ico {
-  font-size: 1.6rem;
   display: inline-flex;
   width: 48px; height: 48px;
   align-items: center; justify-content: center;
   background: var(--accent-soft);
+  color: var(--accent);
   border-radius: 10px;
   margin-bottom: 0.85rem;
+  padding: 12px;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.features article:hover .ico {
+  background: var(--accent);
+  color: white;
+  transform: scale(1.05);
 }
 .features article h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--text-strong); }
 .features article p { margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.55; }
@@ -1117,7 +1125,18 @@ onBeforeUnmount(() => {
   transition: border-color 0.15s, transform 0.15s;
 }
 .personas article:hover { border-color: var(--accent); transform: translateY(-2px); }
-.personas article .ico { font-size: 2rem; margin-bottom: 0.6rem; }
+.personas article .ico {
+  display: inline-flex;
+  width: 52px; height: 52px;
+  align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--accent-soft), #ede9fe);
+  color: var(--accent);
+  border-radius: 14px;
+  margin-bottom: 0.7rem;
+  padding: 13px;
+  transition: transform 0.15s;
+}
+.personas article:hover .ico { transform: rotate(-4deg) scale(1.06); }
 .personas article h3 { margin: 0 0 0.45rem; color: var(--text-strong); font-size: 1.05rem; }
 .personas article p { margin: 0; color: var(--text); font-size: 0.9rem; line-height: 1.55; }
 
