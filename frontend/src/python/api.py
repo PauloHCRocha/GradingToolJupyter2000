@@ -220,7 +220,30 @@ def run_code(code, stdin=""):
     }
 
 
-def plagiarism_analyze(threshold):
+def _build_clusters_payload(matrix, students, cluster_threshold):
+    """Compute clusters and decorate with names/numbers — used by both
+    plagiarism_analyze and plagiarism_cluster."""
+    raw = plagiarism.cluster_students(matrix, threshold=float(cluster_threshold))
+    decorated = []
+    for c in raw["clusters"]:
+        members = c["members"]
+        decorated.append({
+            "id": c["id"],
+            "size": c["size"],
+            "avg_similarity": c["avg_similarity"],
+            "members": members,
+            "member_ids": [students[m].id for m in members],
+            "member_names": [students[m].name for m in members],
+        })
+    return {
+        "cluster_assignments": raw["cluster_assignments"],
+        "clusters": decorated,
+        "outliers": raw["outliers"],
+        "num_clusters": raw["num_clusters"],
+    }
+
+
+def plagiarism_analyze(threshold, cluster_threshold=0.7):
     students = state.list_students_sorted_by_name()
     if len(students) < 2:
         raise ValueError("Need at least 2 submissions.")
@@ -229,13 +252,19 @@ def plagiarism_analyze(threshold):
     state.set_plagiarism(matrix, [s.id for s in students])
 
     pairs_raw = plagiarism.find_suspicious_pairs(matrix, float(threshold))
+    clusters_payload = _build_clusters_payload(matrix, students, cluster_threshold)
+    cluster_of = clusters_payload["cluster_assignments"]
+
     pairs = [
         {
             "student1_id": students[i].id,
             "student1_name": students[i].name,
+            "student1_index": i,
             "student2_id": students[j].id,
             "student2_name": students[j].name,
+            "student2_index": j,
             "similarity": sim,
+            "cluster_id": cluster_of[i] if cluster_of[i] == cluster_of[j] else -1,
         }
         for i, j, sim in pairs_raw
     ]
@@ -246,6 +275,7 @@ def plagiarism_analyze(threshold):
 
     return {
         "threshold": float(threshold),
+        "cluster_threshold": float(cluster_threshold),
         "matrix": matrix,
         "student_ids": [s.id for s in students],
         "student_names": [s.name for s in students],
@@ -255,8 +285,24 @@ def plagiarism_analyze(threshold):
             "suspicious_count": len(pairs),
             "high_similarity_count": high,
             "avg_similarity": avg,
+            "num_clusters": clusters_payload["num_clusters"],
+            "largest_cluster": max((c["size"] for c in clusters_payload["clusters"]), default=0),
+            "outliers_count": len(clusters_payload["outliers"]),
         },
+        **clusters_payload,
     }
+
+
+def plagiarism_cluster(threshold=0.7):
+    """Re-cluster students with a different threshold without recomputing
+    the (expensive) similarity matrix. Requires plagiarism_analyze to have
+    run before."""
+    matrix, ids = state.get_plagiarism()
+    if matrix is None:
+        raise ValueError("Run plagiarism analysis first.")
+    students_by_id = {s.id: s for s in state.list_students_sorted_by_name()}
+    students = [students_by_id[i] for i in ids if i in students_by_id]
+    return _build_clusters_payload(matrix, students, threshold)
 
 
 def plagiarism_compare(student1_id, student2_id):
@@ -279,9 +325,19 @@ def plagiarism_compare(student1_id, student2_id):
             tf = plagiarism.tfidf_similarity(c1, c2)
             asts = plagiarism.ast_similarity(c1, c2)
             sim = 0.6 * tf + 0.4 * asts
+            blocks = plagiarism.analyze_blocks(c1, c2)
         else:
             tf = asts = sim = 0.0
-        q_results.append({"question_id": qid, "similarity": sim, "tfidf": tf, "ast": asts})
+            blocks = []
+        q_results.append({
+            "question_id": qid,
+            "similarity": sim,
+            "tfidf": tf,
+            "ast": asts,
+            "code1": c1,
+            "code2": c2,
+            "matching_blocks": blocks,
+        })
 
     matrix, ids = state.get_plagiarism()
     overall = 0.0

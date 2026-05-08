@@ -98,30 +98,64 @@ export interface RunCodeResponse {
 export interface SuspiciousPair {
   student1_id: string
   student1_name: string
+  student1_index: number
   student2_id: string
   student2_name: string
+  student2_index: number
   similarity: number
+  cluster_id: number // -1 if not in same cluster
+}
+
+export interface ClusterInfo {
+  id: number
+  size: number
+  avg_similarity: number
+  members: number[]
+  member_ids: string[]
+  member_names: string[]
 }
 
 export interface PlagiarismAnalyzeResponse {
   threshold: number
+  cluster_threshold: number
   matrix: number[][]
   student_ids: string[]
   student_names: string[]
   suspicious_pairs: SuspiciousPair[]
+  cluster_assignments: number[]
+  clusters: ClusterInfo[]
+  outliers: number[]
+  num_clusters: number
   stats: {
     total_comparisons: number
     suspicious_count: number
     high_similarity_count: number
     avg_similarity: number
+    num_clusters: number
+    largest_cluster: number
+    outliers_count: number
   }
 }
 
-export interface QuestionSimilarity {
+export interface MatchingBlock {
+  id: string
+  start1: number
+  end1: number
+  start2: number
+  end2: number
+  color: string
+  type: 'exact' | 'similar' | 'invisible'
+  size: number
+}
+
+export interface QuestionComparison {
   question_id: string
   similarity: number
   tfidf: number
   ast: number
+  code1: string
+  code2: string
+  matching_blocks: MatchingBlock[]
 }
 
 export interface PlagiarismCompareResponse {
@@ -130,9 +164,16 @@ export interface PlagiarismCompareResponse {
   student2_id: string
   student2_name: string
   overall_similarity: number
-  questions: QuestionSimilarity[]
+  questions: QuestionComparison[]
   code1: string
   code2: string
+}
+
+export interface ClusterPayload {
+  cluster_assignments: number[]
+  clusters: ClusterInfo[]
+  outliers: number[]
+  num_clusters: number
 }
 
 async function fileBytes(file: File): Promise<Uint8Array> {
@@ -204,12 +245,17 @@ export async function runCode(code: string, stdin = ''): Promise<RunCodeResponse
 
 export async function plagiarismAnalyze(
   threshold: number,
+  clusterThreshold = 0.7,
   _signal?: AbortSignal,
 ): Promise<PlagiarismAnalyzeResponse> {
   // Note: Pyodide work runs synchronously inside the wasm runtime; we cannot
   // truly abort once it's started. The signal is accepted so callers don't
   // need to change.
-  return callApi<PlagiarismAnalyzeResponse>('plagiarism_analyze', threshold)
+  return callApi<PlagiarismAnalyzeResponse>('plagiarism_analyze', threshold, clusterThreshold)
+}
+
+export async function plagiarismCluster(threshold: number): Promise<ClusterPayload> {
+  return callApi<ClusterPayload>('plagiarism_cluster', threshold)
 }
 
 export async function plagiarismCompare(
