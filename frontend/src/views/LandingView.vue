@@ -72,7 +72,7 @@ onBeforeUnmount(() => {
           </div>
           <h1>
             Grade Jupyter notebooks<br>
-            <span class="accent">3× faster.</span>
+            <span class="accent">faster and efficiently.</span>
           </h1>
           <p class="lead">
             A focused grading workspace for Python and Jupyter assignments.
