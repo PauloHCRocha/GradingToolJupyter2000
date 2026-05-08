@@ -13,18 +13,21 @@ export function clusterColor(clusterId: number): string {
   return CLUSTER_PALETTE[clusterId % CLUSTER_PALETTE.length]
 }
 
-// Heatmap gradient: green (0) → yellow (0.5) → red (1).
-// Same colour stops as the original Flask tool.
-export function heatmapColor(value: number): string {
+// Heatmap gradient: green (0) → yellow (midpoint) → red (1).
+// `midpoint` shifts where yellow sits — moving it down makes more of the
+// scale orange/red (high contrast for low-similarity datasets), moving
+// it up keeps colours green for longer (only the very high values pop).
+export function heatmapColor(value: number, midpoint = 0.5): string {
   const v = Math.max(0, Math.min(1, value))
-  if (v < 0.5) {
-    const t = v / 0.5
+  const m = Math.max(0.05, Math.min(0.95, midpoint))
+  if (v < m) {
+    const t = v / m
     const r = Math.round(46 + (243 - 46) * t)
     const g = Math.round(204 + (156 - 204) * t)
     const b = Math.round(113 + (18 - 113) * t)
     return `rgb(${r}, ${g}, ${b})`
   }
-  const t = (v - 0.5) / 0.5
+  const t = (v - m) / (1 - m)
   const r = Math.round(243 + (231 - 243) * t)
   const g = Math.round(156 + (76 - 156) * t)
   const b = Math.round(18 + (60 - 18) * t)

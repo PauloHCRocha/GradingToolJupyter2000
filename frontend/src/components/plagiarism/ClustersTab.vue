@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ClusterInfo } from '../../api/client'
-import { clusterColor } from './colors'
+import { heatmapColor } from './colors'
 
 const props = defineProps<{
   clusters: ClusterInfo[]
@@ -13,15 +13,26 @@ const emit = defineEmits<{
   compareAll: [memberIds: string[]]
 }>()
 
+// Sort by severity (most-similar clusters first) — same colour ramp as the
+// heatmap, so a cluster with avg_similarity 0.95 is red and 0.55 is yellow.
 const sortedClusters = computed(() =>
-  [...props.clusters].sort((a, b) => b.size - a.size || b.avg_similarity - a.avg_similarity),
+  [...props.clusters].sort((a, b) => b.avg_similarity - a.avg_similarity || b.size - a.size),
 )
 
-function rgba(hex: string, alpha: number): string {
-  const m = hex.replace('#', '').match(/.{2}/g)
-  if (!m) return hex
-  const [r, g, b] = m.map((s) => parseInt(s, 16))
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+function severityFor(c: ClusterInfo): string {
+  return heatmapColor(c.avg_similarity)
+}
+
+function rgba(rgb: string, alpha: number): string {
+  // Accept either #rrggbb or rgb(r, g, b).
+  const hex = rgb.startsWith('#') ? rgb.slice(1).match(/.{2}/g) : null
+  if (hex) {
+    const [r, g, b] = hex.map((s) => parseInt(s, 16))
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+  const m = rgb.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/)
+  if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})`
+  return rgb
 }
 
 function pickPair(cluster: ClusterInfo, idx: number) {
@@ -50,8 +61,8 @@ function pickPair(cluster: ClusterInfo, idx: number) {
         :key="c.id"
         class="cluster"
         :style="{
-          borderLeftColor: clusterColor(c.id),
-          background: `linear-gradient(135deg, ${rgba(clusterColor(c.id), 0.06)}, ${rgba(clusterColor(c.id), 0.02)})`,
+          borderLeftColor: severityFor(c),
+          background: `linear-gradient(135deg, ${rgba(severityFor(c), 0.08)}, ${rgba(severityFor(c), 0.02)})`,
         }"
       >
         <header>
@@ -60,7 +71,7 @@ function pickPair(cluster: ClusterInfo, idx: number) {
             <p class="meta">
               <strong>{{ c.size }}</strong> students ·
               avg similarity
-              <strong :style="{ color: clusterColor(c.id) }">{{ Math.round(c.avg_similarity * 100) }}%</strong>
+              <strong :style="{ color: severityFor(c) }">{{ Math.round(c.avg_similarity * 100) }}%</strong>
             </p>
           </div>
           <button
@@ -73,7 +84,7 @@ function pickPair(cluster: ClusterInfo, idx: number) {
           <li
             v-for="(name, i) in c.member_names"
             :key="c.member_ids[i]"
-            :style="{ borderColor: clusterColor(c.id) }"
+            :style="{ borderColor: severityFor(c) }"
             tabindex="0"
             @click="pickPair(c, i)"
             @keydown.enter="pickPair(c, i)"

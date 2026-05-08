@@ -1,16 +1,24 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Network, type Options } from 'vis-network'
 import { DataSet } from 'vis-data'
-import type { SuspiciousPair } from '../../api/client'
-import { clusterColor } from './colors'
+import type { ClusterInfo, SuspiciousPair } from '../../api/client'
+import { heatmapColor, NO_CLUSTER_COLOR } from './colors'
 
 const props = defineProps<{
   studentIds: string[]
   studentNames: string[]
   pairs: SuspiciousPair[]
   clusterAssignments: number[]
+  clusters: ClusterInfo[]
 }>()
+
+// cluster_id → severity colour (same scale as the heatmap).
+const clusterColorMap = computed<Record<number, string>>(() => {
+  const map: Record<number, string> = {}
+  for (const c of props.clusters) map[c.id] = heatmapColor(c.avg_similarity)
+  return map
+})
 const emit = defineEmits<{
   compare: [s1: string, s2: string]
 }>()
@@ -46,7 +54,7 @@ function build() {
   const nodeData = Array.from(involved).map((id) => {
     const i = indexById[id]
     const cId = clusterAssignments[i] ?? -1
-    const c = clusterColor(cId)
+    const c = cId >= 0 ? clusterColorMap.value[cId] ?? NO_CLUSTER_COLOR : NO_CLUSTER_COLOR
     return {
       id,
       label: studentNames[i] ?? id,
@@ -126,16 +134,23 @@ function destroyNetwork() {
 }
 
 // Rebuild whenever the inputs change.
-watch(() => [props.pairs, props.studentIds, props.clusterAssignments] as const, build, { deep: true })
+watch(() => [props.pairs, props.studentIds, props.clusterAssignments, props.clusters] as const, build, { deep: true })
 
 onMounted(build)
 onBeforeUnmount(destroyNetwork)
 
-// Tiny helper: shade a hex color toward black/white by a -1..1 amount.
-function shade(hex: string, percent: number): string {
-  const m = hex.replace('#', '').match(/.{2}/g)
-  if (!m) return hex
-  const [r, g, b] = m.map((s) => parseInt(s, 16))
+// Tiny helper: shade a colour toward black/white by a -1..1 amount.
+// Accepts both #rrggbb and rgb(r, g, b).
+function shade(input: string, percent: number): string {
+  let r = 0, g = 0, b = 0
+  const hex = input.startsWith('#') ? input.slice(1).match(/.{2}/g) : null
+  if (hex) {
+    [r, g, b] = hex.map((s) => parseInt(s, 16))
+  } else {
+    const m = input.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/)
+    if (m) { r = +m[1]; g = +m[2]; b = +m[3] }
+    else return input
+  }
   const adj = (c: number) => {
     const t = percent < 0 ? 0 : 255
     const p = Math.abs(percent)

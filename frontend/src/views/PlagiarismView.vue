@@ -382,6 +382,7 @@ async function exportFullReport() {
             :student-names="result.student_names"
             :pairs="result.suspicious_pairs"
             :cluster-assignments="result.cluster_assignments"
+            :clusters="result.clusters"
             @compare="openCompare"
           />
 
@@ -397,6 +398,7 @@ async function exportFullReport() {
           <PairsTab
             v-if="activeTab === 'pairs'"
             :pairs="result.suspicious_pairs"
+            :clusters="result.clusters"
             :threshold="threshold"
             @compare="openCompare"
             @export-pdf="exportPairPdfHandler"

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { SuspiciousPair } from '../../api/client'
-import { clusterColor, severityClass } from './colors'
+import type { ClusterInfo, SuspiciousPair } from '../../api/client'
+import { heatmapColor, severityClass } from './colors'
 
 const props = defineProps<{
   pairs: SuspiciousPair[]
+  clusters: ClusterInfo[]
   threshold: number
 }>()
 const emit = defineEmits<{
@@ -15,12 +16,18 @@ const emit = defineEmits<{
 type SortMode = 'similarity' | 'cluster'
 const sortMode = ref<SortMode>('similarity')
 
+// Map cluster_id → severity colour (from the cluster's avg_similarity).
+// Same logic as the heatmap: more similar clusters look redder.
+const clusterColorMap = computed<Record<number, string>>(() => {
+  const map: Record<number, string> = {}
+  for (const c of props.clusters) map[c.id] = heatmapColor(c.avg_similarity)
+  return map
+})
+
 const sorted = computed(() => {
   const arr = [...props.pairs]
   if (sortMode.value === 'cluster') {
     arr.sort((a, b) => {
-      // Pairs with the same cluster come first, grouped by cluster_id, then
-      // ordered by similarity within. Outliers (-1) go last.
       const ca = a.cluster_id < 0 ? 1 : 0
       const cb = b.cluster_id < 0 ? 1 : 0
       if (ca !== cb) return ca - cb
@@ -33,11 +40,15 @@ const sorted = computed(() => {
   return arr
 })
 
-function rgba(hex: string, alpha: number): string {
-  const m = hex.replace('#', '').match(/.{2}/g)
-  if (!m) return hex
-  const [r, g, b] = m.map((s) => parseInt(s, 16))
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+function rgba(rgb: string, alpha: number): string {
+  const hex = rgb.startsWith('#') ? rgb.slice(1).match(/.{2}/g) : null
+  if (hex) {
+    const [r, g, b] = hex.map((s) => parseInt(s, 16))
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+  const m = rgb.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/)
+  if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})`
+  return rgb
 }
 </script>
 
@@ -66,17 +77,17 @@ function rgba(hex: string, alpha: number): string {
         v-for="p in sorted"
         :key="p.student1_id + '-' + p.student2_id"
         :class="severityClass(p.similarity)"
-        :style="p.cluster_id >= 0 ? {
-          background: `linear-gradient(90deg, ${rgba(clusterColor(p.cluster_id), 0.18)}, ${rgba(clusterColor(p.cluster_id), 0.05)})`,
-          borderLeftColor: clusterColor(p.cluster_id),
+        :style="p.cluster_id >= 0 && clusterColorMap[p.cluster_id] ? {
+          background: `linear-gradient(90deg, ${rgba(clusterColorMap[p.cluster_id], 0.18)}, ${rgba(clusterColorMap[p.cluster_id], 0.05)})`,
+          borderLeftColor: clusterColorMap[p.cluster_id],
         } : {}"
       >
         <div class="names" @click="emit('compare', p.student1_id, p.student2_id)">
           <strong>{{ p.student1_name }}</strong>
           <span class="sep">↔</span>
           <strong>{{ p.student2_name }}</strong>
-          <span v-if="p.cluster_id >= 0" class="cluster-badge"
-                :style="{ background: clusterColor(p.cluster_id), color: 'white' }">
+          <span v-if="p.cluster_id >= 0 && clusterColorMap[p.cluster_id]" class="cluster-badge"
+                :style="{ background: clusterColorMap[p.cluster_id], color: 'white' }">
             cluster #{{ p.cluster_id + 1 }}
           </span>
         </div>
