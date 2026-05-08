@@ -34,7 +34,6 @@ const stageLabel: Record<string, string> = {
   <Transition name="boot">
     <div v-if="showBoot" class="boot-overlay">
       <div class="boot-card">
-        <div class="boot-icon">🪐</div>
         <h1>Granymede</h1>
         <p class="lead">
           The whole tool runs <strong>inside your browser</strong>.

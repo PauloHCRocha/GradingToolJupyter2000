@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
     <!-- ==================== HERO ==================== -->
     <header class="hero">
       <nav class="topnav">
-        <span class="logo">🪐 Granymede</span>
+        <span class="logo">Granymede</span>
         <div class="topnav-actions">
           <ThemeToggle />
         </div>
@@ -72,7 +72,7 @@ onBeforeUnmount(() => {
           </div>
           <h1>
             Grade Jupyter notebooks<br>
-            <span class="accent">without uploading anything.</span>
+            <span class="accent">3× faster.</span>
           </h1>
           <p class="lead">
             A focused grading workspace for Python and Jupyter assignments.
