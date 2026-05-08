@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { analyzeSolution, uploadSubmissions } from '../api/client'
 import { useSessionStore } from '../stores/session'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import PointsInput from '../components/PointsInput.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -180,11 +181,12 @@ async function onContinue() {
                     <td><code class="qcode">{{ q.id }}</code></td>
                     <td>{{ q.label }}</td>
                     <td class="num-col">
-                      <input class="pts-input"
-                        type="number" step="0.5" min="0"
-                        :value="q.max_points"
+                      <PointsInput
+                        :model-value="q.max_points"
+                        :step="0.5"
+                        :min="0"
                         :disabled="!q.enabled"
-                        @input="(e) => session.updateMaxPoints(q.id, Number((e.target as HTMLInputElement).value))"
+                        @update:model-value="(v: number) => session.updateMaxPoints(q.id, v)"
                       />
                     </td>
                     <td class="statement">
@@ -457,7 +459,6 @@ async function onContinue() {
   border-color: var(--border);
   color: var(--text-muted);
 }
-.qtable tr.skipped .pts-input { color: var(--text-muted); }
 
 .qtable th {
   background: var(--bg-soft);
@@ -475,7 +476,7 @@ async function onContinue() {
 }
 .qtable tr:last-child td { border-bottom: none; }
 .qtable tr:hover { background: var(--bg-soft); }
-.num-col { width: 110px; }
+.num-col { width: 130px; }
 .qcode {
   background: var(--accent-soft);
   color: var(--accent-tx);
@@ -484,12 +485,6 @@ async function onContinue() {
   font-size: 0.82rem;
   font-weight: 600;
   border: 1px solid var(--accent-bd);
-}
-.pts-input {
-  width: 80px; padding: 0.3rem 0.5rem;
-  font-family: ui-monospace, monospace;
-  font-weight: 600;
-  text-align: center;
 }
 .statement { color: var(--text-muted); font-size: 0.83rem; max-width: 400px; }
 
