@@ -131,7 +131,7 @@ onBeforeUnmount(() => {
     <section class="testimonial reveal">
       <div class="quote-card">
         <div class="stat">
-          <strong>5×</strong>
+          <strong>3×</strong>
           <span>faster grading</span>
         </div>
         <div class="claim">
@@ -139,7 +139,7 @@ onBeforeUnmount(() => {
           <p>
             Question detection, grade suggestions and side-by-side review
             handle the mechanical parts of marking — the
-            <span class="hl">potential to grade roughly 5× faster</span>
+            <span class="hl">potential to grade roughly 3× faster</span>
             on a typical Python or Jupyter assignment, leaving you with
             just the judgment calls.
           </p>
