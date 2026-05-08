@@ -5,6 +5,7 @@ import { useSessionStore } from '../stores/session'
 import { downloadGradesCsv, runCode, suggestGrade } from '../api/client'
 import type { CellOut, RunCodeResponse, SuggestResponse } from '../api/client'
 import NotebookViewer from '../components/NotebookViewer.vue'
+import CodeEditor from '../components/CodeEditor.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -458,8 +459,13 @@ function gradeFor(qid: string): number | null {
           <h3>▶ Run code</h3>
           <span class="card-meta muted">Runs as a Python subprocess (10s timeout)</span>
         </header>
-        <textarea class="code-in" v-model="runnerCode" rows="12"
-                  placeholder="Paste or load the student's code here..." />
+        <div class="runner-editor">
+          <CodeEditor
+            v-model="runnerCode"
+            :rows="12"
+            placeholder="Paste or load the student's code here..."
+          />
+        </div>
         <div class="run-row">
           <input class="stdin" v-model="runnerStdin" placeholder="Optional stdin" />
           <button class="btn btn-primary" :disabled="runnerLoading" @click="onRun">
@@ -788,17 +794,8 @@ function gradeFor(qid: string): number | null {
 
 /* runner */
 .runner { padding: 0; }
-.code-in {
-  display: block;
-  width: calc(100% - 1.6rem);
+.runner-editor {
   margin: 0.7rem 0.8rem 0.4rem;
-  padding: 0.55rem 0.7rem;
-  background: var(--code-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.82rem;
-  resize: vertical;
 }
 .run-row {
   display: flex; gap: 0.5rem; align-items: center;
