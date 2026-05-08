@@ -223,6 +223,7 @@ function onBgClick(e: MouseEvent) {
 .overall strong.high { color: #fca5a5; }
 .overall strong.med { color: #fcd34d; }
 .overall strong.low { color: #86efac; }
+/* (header sits on a navy bg in both themes — fixed colours are fine here) */
 .actions { display: flex; gap: 0.4rem; }
 .btn-pdf { background: var(--danger); border: none; color: white; padding: 0.35rem 0.7rem; border-radius: 6px; font-size: 0.82rem; }
 .btn-pdf:hover { background: #b91c1c; }

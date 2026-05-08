@@ -394,20 +394,20 @@ async function onContinue() {
 }
 .pill.type {
   background: var(--accent-soft);
-  border-color: #bfdbfe;
-  color: #1e40af;
+  border-color: var(--accent-bd);
+  color: var(--accent-tx);
   font-family: ui-monospace, monospace;
 }
 .pill.total {
   background: var(--success-soft);
-  border-color: #a7f3d0;
-  color: #065f46;
+  border-color: var(--success-bd);
+  color: var(--success-tx);
   font-weight: 600;
 }
 .pill.warn {
   background: var(--warning-soft);
-  border-color: #fde68a;
-  color: #92400e;
+  border-color: var(--warning-bd);
+  color: var(--warning-tx);
 }
 
 /* Question table */
@@ -473,12 +473,12 @@ async function onContinue() {
 .num-col { width: 110px; }
 .qcode {
   background: var(--accent-soft);
-  color: #1e40af;
+  color: var(--accent-tx);
   padding: 2px 7px;
   border-radius: 4px;
   font-size: 0.82rem;
   font-weight: 600;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--accent-bd);
 }
 .pts-input {
   width: 80px; padding: 0.3rem 0.5rem;

@@ -661,7 +661,7 @@ function gradeFor(qid: string): number | null {
   border-radius: 6px;
   font-size: 0.82rem;
 }
-.alert.warn { background: var(--warning-soft); color: #92400e; border-left: 3px solid var(--warning); }
+.alert.warn { background: var(--warning-soft); color: var(--warning-tx); border-left: 3px solid var(--warning); }
 
 /* summary card */
 .summary-list { list-style: none; margin: 0; padding: 0.5rem 0; }
@@ -782,9 +782,9 @@ function gradeFor(qid: string): number | null {
   letter-spacing: 0.4px;
   font-weight: 600;
 }
-.conf-pill.high { background: var(--success-soft); color: #065f46; }
-.conf-pill.medium { background: var(--warning-soft); color: #92400e; }
-.conf-pill.low { background: var(--danger-soft); color: #991b1b; }
+.conf-pill.high { background: var(--success-soft); color: var(--success-tx); }
+.conf-pill.medium { background: var(--warning-soft); color: var(--warning-tx); }
+.conf-pill.low { background: var(--danger-soft); color: var(--danger-tx); }
 .conf-pill.none { background: var(--border); color: var(--text-muted); }
 .suggest-comment {
   margin: 0.5rem 0 0;
@@ -800,10 +800,10 @@ function gradeFor(qid: string): number | null {
 
 /* code panes */
 .pane { padding: 0; }
-.card-head.solution { background: #ebf5ff; border-bottom-color: #bfdbfe; }
-.card-head.solution h3 { color: #1e3a8a; }
-.card-head.student { background: #ecfdf5; border-bottom-color: #a7f3d0; }
-.card-head.student h3 { color: #14532d; }
+.card-head.solution { background: var(--solution-bg); border-bottom-color: var(--solution-bd); }
+.card-head.solution h3 { color: var(--solution-tx); }
+.card-head.student { background: var(--student-bg); border-bottom-color: var(--student-bd); }
+.card-head.student h3 { color: var(--student-tx); }
 .btn-small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
 .pane-body {
   max-height: 540px;
@@ -844,7 +844,7 @@ function gradeFor(qid: string): number | null {
   white-space: pre-wrap; word-break: break-word;
   max-height: 240px; overflow: auto;
 }
-.run-out pre.err { border-color: var(--danger); background: var(--danger-soft); color: #991b1b; }
+.run-out pre.err { border-color: var(--danger); background: var(--danger-soft); color: var(--danger-tx); }
 
 /* spinner */
 .spin {

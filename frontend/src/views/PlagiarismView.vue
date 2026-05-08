@@ -508,7 +508,7 @@ async function exportFullReport() {
 
 .progress {
   background: var(--accent-soft);
-  border-color: #bfdbfe;
+  border-color: var(--accent-bd);
 }
 .progress-row {
   display: flex; align-items: center; gap: 0.85rem;

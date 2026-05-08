@@ -33,6 +33,26 @@
   --output-text: #6b4519;
   --output-label: #b45309;
 
+  /* Tinted text/border tokens for soft-coloured pills, badges and
+     section heads. The "-tx" suffix is "darker text on tinted bg" in
+     light mode; in dark mode the tints invert (darker bg, lighter text). */
+  --accent-tx: #1e40af;
+  --accent-bd: #bfdbfe;
+  --success-tx: #065f46;
+  --success-bd: #a7f3d0;
+  --warning-tx: #92400e;
+  --warning-bd: #fde68a;
+  --danger-tx: #991b1b;
+  --danger-bd: #fecaca;
+
+  /* Solution / Student pane header tints (side-by-side review). */
+  --solution-bg: #ebf5ff;
+  --solution-tx: #1e3a8a;
+  --solution-bd: #bfdbfe;
+  --student-bg: #ecfdf5;
+  --student-tx: #14532d;
+  --student-bd: #a7f3d0;
+
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   color: var(--text);
@@ -72,6 +92,22 @@
   --output-bg: rgba(245, 158, 11, 0.07);
   --output-text: #fcd34d;
   --output-label: #fbbf24;
+
+  --accent-tx: #93c5fd;
+  --accent-bd: rgba(96, 165, 250, 0.35);
+  --success-tx: #86efac;
+  --success-bd: rgba(34, 197, 94, 0.35);
+  --warning-tx: #fcd34d;
+  --warning-bd: rgba(245, 158, 11, 0.35);
+  --danger-tx: #fca5a5;
+  --danger-bd: rgba(248, 113, 113, 0.35);
+
+  --solution-bg: rgba(96, 165, 250, 0.1);
+  --solution-tx: #93c5fd;
+  --solution-bd: rgba(96, 165, 250, 0.3);
+  --student-bg: rgba(34, 197, 94, 0.08);
+  --student-tx: #86efac;
+  --student-bd: rgba(34, 197, 94, 0.3);
 
   color-scheme: dark;
 }
