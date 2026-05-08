@@ -292,7 +292,7 @@ async function exportFullReport() {
             </label>
             <button class="btn btn-primary big" :disabled="analyzing" @click="runAnalyze">
               <span v-if="analyzing" class="spin" />
-              {{ analyzing ? 'Analyzing…' : '▶ Run plagiarism detection' }}
+              {{ analyzing ? 'Analysing…' : 'Run analysis' }}
             </button>
           </div>
           <p class="hint">
@@ -302,7 +302,7 @@ async function exportFullReport() {
           </p>
         </section>
 
-        <p v-if="error" class="error">⚠ {{ error }}</p>
+        <p v-if="error" class="error">{{ error }}</p>
 
         <section v-if="analyzing" class="card progress">
           <div class="progress-row">
@@ -344,24 +344,24 @@ async function exportFullReport() {
         <section v-if="result" class="card tabs-card">
           <nav class="tabbar">
             <button :class="{ active: activeTab === 'heatmap' }" @click="activeTab = 'heatmap'">
-              📊 Heatmap
+              Heatmap
             </button>
             <button :class="{ active: activeTab === 'network' }" @click="activeTab = 'network'">
-              🕸️ Network
+              Network
             </button>
             <button :class="{ active: activeTab === 'clusters' }" @click="activeTab = 'clusters'">
-              🎨 Clusters
+              Clusters
               <span class="badge">{{ result.stats.num_clusters }}</span>
             </button>
             <button :class="{ active: activeTab === 'pairs' }" @click="activeTab = 'pairs'">
-              📋 Pairs
+              Pairs
               <span class="badge">{{ result.stats.suspicious_count }}</span>
             </button>
             <div class="tab-spacer" />
             <button class="btn btn-pdf" :disabled="exportingPdf || !result.suspicious_pairs.length"
                     @click="exportFullReport">
               <span v-if="exportingPdf" class="spin" />
-              📥 Full PDF report
+              Export PDF report
             </button>
           </nav>
 
@@ -411,7 +411,7 @@ async function exportFullReport() {
       @close="closeCompare"
       @export-pdf="exportModalPdf"
     />
-    <p v-if="compareError" class="error floating">⚠ {{ compareError }}</p>
+    <p v-if="compareError" class="error floating">{{ compareError }}</p>
   </div>
 </template>
 
