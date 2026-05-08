@@ -76,8 +76,8 @@ onBeforeUnmount(() => {
           </h1>
           <p class="lead">
             A focused grading workspace for Python and Jupyter assignments.
-            Question detection, side-by-side review, AI-free grade suggestions
-            and plagiarism analysis — all in one tab.
+            Question detection, side-by-side review, grade suggestions and
+            plagiarism analysis — fast enough to grade a class in an afternoon.
           </p>
           <div class="cta-row">
             <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
@@ -126,6 +126,24 @@ onBeforeUnmount(() => {
       </div>
 
     </header>
+
+    <!-- ==================== TESTIMONIAL / SPEED ==================== -->
+    <section class="testimonial reveal">
+      <div class="quote-card">
+        <div class="stat">
+          <strong>5×</strong>
+          <span>faster grading</span>
+        </div>
+        <blockquote>
+          “I graded my class in
+          <span class="hl">20% of the time</span>
+          I had originally budgeted.”
+        </blockquote>
+        <cite>
+          — Paulo Rocha, course instructor and author of the tool
+        </cite>
+      </div>
+    </section>
 
     <!-- ==================== WORKFLOW PREVIEW ==================== -->
     <section class="workflow reveal">
@@ -614,6 +632,83 @@ onBeforeUnmount(() => {
 .qchip { padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
 .qchip.on { background: #2563eb; color: white; }
 .grade-score { margin-left: auto; color: #6ee7b7; font-weight: 600; }
+
+/* ==================== Testimonial / speed ==================== */
+.testimonial {
+  padding: 4rem 1.5rem 2.5rem;
+  background: var(--bg-page);
+}
+.quote-card {
+  max-width: 880px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2rem;
+  padding: 1.7rem 2rem;
+  background: linear-gradient(135deg, #ffffff 0%, var(--accent-soft) 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+}
+.quote-card .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: 1.6rem;
+  border-right: 1px solid #bfdbfe;
+  min-width: 120px;
+}
+.quote-card .stat strong {
+  font-size: clamp(2.4rem, 4.5vw, 3.4rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.quote-card .stat span {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.quote-card blockquote {
+  margin: 0 0 0.6rem;
+  padding: 0;
+  font-size: clamp(1.05rem, 1.7vw, 1.3rem);
+  line-height: 1.5;
+  color: var(--text-strong);
+  font-weight: 500;
+  font-style: italic;
+}
+.quote-card blockquote .hl {
+  color: var(--accent);
+  font-weight: 700;
+  font-style: normal;
+}
+.quote-card cite {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+@media (max-width: 700px) {
+  .quote-card {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.4rem 1.5rem;
+  }
+  .quote-card .stat {
+    border-right: none;
+    border-bottom: 1px solid #bfdbfe;
+    padding-right: 0;
+    padding-bottom: 1rem;
+  }
+}
 
 /* ==================== Section heads ==================== */
 .section-head { max-width: 720px; margin: 0 auto 2.2rem; text-align: center; }
