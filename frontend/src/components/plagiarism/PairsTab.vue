@@ -93,7 +93,7 @@ function rgba(hex: string, alpha: number): string {
           </button>
           <button class="btn btn-small btn-pdf"
                   @click.stop="emit('exportPdf', p)">
-            📥 PDF
+            PDF
           </button>
         </div>
       </li>

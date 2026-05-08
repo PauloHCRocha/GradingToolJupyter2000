@@ -113,7 +113,7 @@ function onBgClick(e: MouseEvent) {
           </div>
           <div class="actions">
             <button v-if="result" class="btn btn-pdf" @click="emit('exportPdf')">
-              📥 PDF report
+              Export PDF
             </button>
             <button class="btn ghost" @click="emit('close')">✕</button>
           </div>

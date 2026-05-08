@@ -283,8 +283,8 @@ function gradeFor(qid: string): number | null {
       </RouterLink>
       <div class="actions">
         <button class="btn" @click="router.push('/setup')">← Setup</button>
-        <button class="btn btn-primary" @click="downloadGradesCsv">📥 Export CSV</button>
-        <button class="btn btn-warn" @click="router.push('/plagiarism')">⚠ Plagiarism</button>
+        <button class="btn btn-primary" @click="downloadGradesCsv">Export CSV</button>
+        <button class="btn btn-warn" @click="router.push('/plagiarism')">Plagiarism</button>
         <ThemeToggle />
       </div>
     </header>
@@ -396,11 +396,11 @@ function gradeFor(qid: string): number | null {
           </div>
           <button class="btn btn-suggest" :disabled="suggesting" @click="onSuggest">
             <span v-if="suggesting" class="spin" />
-            {{ suggesting ? 'Analyzing…' : '✨ Suggest grade' }}
+            {{ suggesting ? 'Analysing…' : 'Suggest grade' }}
           </button>
           <button class="btn btn-primary" :disabled="saving[selectedQuestion.id]"
                   @click="save(selectedQuestion.id)">
-            {{ saving[selectedQuestion.id] ? 'Saving…' : '💾 Save grade' }}
+            {{ saving[selectedQuestion.id] ? 'Saving…' : 'Save grade' }}
           </button>
         </div>
 
@@ -435,7 +435,7 @@ function gradeFor(qid: string): number | null {
         :style="{ '--split-left': splitRatio + '%' }"
       >
         <article class="card pane left">
-          <header class="card-head solution"><h3>📘 Solution</h3></header>
+          <header class="card-head solution"><h3><span class="side-dot" />Solution</h3></header>
           <div class="pane-body">
             <NotebookViewer :cells="solutionCellsForQuestion"
                             placeholder="No solution cells for this question." />
@@ -453,8 +453,8 @@ function gradeFor(qid: string): number | null {
         />
         <article class="card pane right">
           <header class="card-head student">
-            <h3>📝 Student submission</h3>
-            <button class="btn btn-small" @click="loadStudentCodeIntoRunner">↓ Load to runner</button>
+            <h3><span class="side-dot" />Student submission</h3>
+            <button class="btn btn-small" @click="loadStudentCodeIntoRunner">Load to runner</button>
           </header>
           <div class="pane-body">
             <NotebookViewer :cells="studentCellsForQuestion"
@@ -465,7 +465,7 @@ function gradeFor(qid: string): number | null {
 
       <section v-if="session.selectedStudentId" class="card runner">
         <header class="card-head">
-          <h3>▶ Run code</h3>
+          <h3>Run code</h3>
           <span class="card-meta muted">Runs as a Python subprocess (10s timeout)</span>
         </header>
         <div class="runner-editor">
@@ -479,7 +479,7 @@ function gradeFor(qid: string): number | null {
           <input class="stdin" v-model="runnerStdin" placeholder="Optional stdin" />
           <button class="btn btn-primary" :disabled="runnerLoading" @click="onRun">
             <span v-if="runnerLoading" class="spin" />
-            {{ runnerLoading ? 'Running…' : '▶ Run' }}
+            {{ runnerLoading ? 'Running…' : 'Run' }}
           </button>
           <span v-if="runnerResult" class="run-meta" :class="runnerResult.success ? 'ok' : 'err'">
             {{ runnerResult.success ? '✓' : '✗' }} {{ runnerResult.duration_ms }}ms
@@ -802,9 +802,16 @@ function gradeFor(qid: string): number | null {
 /* code panes */
 .pane { padding: 0; }
 .card-head.solution { background: var(--solution-bg); border-bottom-color: var(--solution-bd); }
-.card-head.solution h3 { color: var(--solution-tx); }
+.card-head.solution h3 { color: var(--solution-tx); display: inline-flex; align-items: center; gap: 0.5rem; }
 .card-head.student { background: var(--student-bg); border-bottom-color: var(--student-bd); }
-.card-head.student h3 { color: var(--student-tx); }
+.card-head.student h3 { color: var(--student-tx); display: inline-flex; align-items: center; gap: 0.5rem; }
+.card-head .side-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
 .btn-small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
 .pane-body {
   max-height: 540px;

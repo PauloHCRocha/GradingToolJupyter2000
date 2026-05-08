@@ -67,7 +67,7 @@ function pickPair(cluster: ClusterInfo, idx: number) {
             class="btn btn-primary"
             :disabled="c.size < 2"
             @click="emit('compareAll', c.member_ids)"
-          >🔍 Compare all</button>
+          >Compare all</button>
         </header>
         <ul class="members">
           <li
