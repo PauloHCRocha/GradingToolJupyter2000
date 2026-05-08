@@ -719,7 +719,7 @@ function gradeFor(qid: string): number | null {
   border-left: 3px solid var(--accent);
   border-radius: 4px;
   font-size: 0.85rem;
-  color: #1e3a5f;
+  color: var(--accent-tx);
 }
 
 /* grading */
