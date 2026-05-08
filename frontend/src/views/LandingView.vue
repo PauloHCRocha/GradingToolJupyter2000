@@ -75,9 +75,9 @@ onBeforeUnmount(() => {
             <span class="accent">without uploading anything.</span>
           </h1>
           <p class="lead">
-            A simple, private grading workspace for Python and Jupyter assignments.
-            Your students' files never leave your browser. There is no server,
-            no account, and nothing is sent anywhere.
+            A focused grading workspace for Python and Jupyter assignments.
+            Question detection, side-by-side review, AI-free grade suggestions
+            and plagiarism analysis — all in one tab.
           </p>
           <div class="cta-row">
             <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
@@ -125,20 +125,13 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Trust strip — quick reassurance after the hero CTA. -->
-      <div class="trust-strip">
-        <div><strong>0</strong><span>servers touched</span></div>
-        <div><strong>0</strong><span>accounts to create</span></div>
-        <div><strong>∞</strong><span>students per session</span></div>
-        <div><strong>~6 MB</strong><span>once-cached runtime</span></div>
-      </div>
     </header>
 
     <!-- ==================== WORKFLOW PREVIEW ==================== -->
     <section class="workflow reveal">
       <header class="section-head">
-        <h2>Three screens, one private session</h2>
-        <p>From dropping the solution to flagging suspicious pairs — all in your tab.</p>
+        <h2>Inside the workspace</h2>
+        <p>Three views handle the whole flow — drop the solution, grade student-by-student, then surface suspicious pairs.</p>
       </header>
 
       <div class="screens">
@@ -151,13 +144,21 @@ onBeforeUnmount(() => {
               <span class="mock-title">Setup</span>
             </div>
             <div class="mock-body setup-mock">
-              <div class="step done">✓ Solution uploaded</div>
-              <div class="step done">✓ 8 questions detected · 20 pts total</div>
+              <div class="filebox">
+                <span class="ico">📄</span>
+                <span class="fname">assignment_2_solution.ipynb</span>
+                <span class="ftag">analyzed</span>
+              </div>
+              <div class="meta-row">
+                <span class="pill ok">8 detected</span>
+                <span class="pill">20 pts total</span>
+                <span class="pill">7 to grade</span>
+              </div>
               <div class="qrow"><span class="check on">✓</span><code>Q1-1</code><span class="bar"><i style="width: 40%" /></span><span class="pts">2 pt</span></div>
               <div class="qrow"><span class="check on">✓</span><code>Q1-2</code><span class="bar"><i style="width: 40%" /></span><span class="pts">2 pt</span></div>
               <div class="qrow"><span class="check on">✓</span><code>Q2</code><span class="bar"><i style="width: 70%" /></span><span class="pts">8 pt</span></div>
               <div class="qrow off"><span class="check">✗</span><code>Q4</code><span class="bar"><i style="width: 30%" /></span><span class="pts">3 pt</span></div>
-              <div class="step">Drop submissions.zip ↓</div>
+              <div class="dropzone">⬆  Drop submissions.zip</div>
             </div>
           </div>
         </article>
@@ -171,22 +172,30 @@ onBeforeUnmount(() => {
               <span class="mock-title">Grading workspace</span>
             </div>
             <div class="mock-body grading-mock">
-              <div class="g-top">Alice Martin · #10001 · <strong>14 / 20</strong></div>
+              <div class="g-top">
+                <button class="g-nav">‹</button>
+                <div class="g-name">
+                  <strong>Alice Martin</strong>
+                  <span>#10001 · 14 / 20</span>
+                </div>
+                <button class="g-nav">›</button>
+              </div>
               <div class="g-chips">
                 <span class="qchip done">Q1-1</span>
                 <span class="qchip done">Q1-2</span>
                 <span class="qchip active">Q2</span>
                 <span class="qchip">Q3</span>
+                <span class="qchip">Q4</span>
               </div>
               <div class="g-pane">
                 <div class="g-col solution">
-                  <div class="lbl">Solution</div>
+                  <div class="lbl">📘 Solution</div>
                   <div class="g-line"><span class="kw">def</span> <span class="fn">approximate_pi</span>(n):</div>
                   <div class="g-line">  inside = <span class="num">0</span></div>
                   <div class="g-line">  <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(n):</div>
                 </div>
                 <div class="g-col student">
-                  <div class="lbl">Student</div>
+                  <div class="lbl">📝 Student</div>
                   <div class="g-line"><span class="kw">def</span> <span class="fn">approximate_pi</span>(N):</div>
                   <div class="g-line">  hit = <span class="num">0</span></div>
                   <div class="g-line">  <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(N):</div>
@@ -194,36 +203,57 @@ onBeforeUnmount(() => {
               </div>
               <div class="g-actions">
                 <span class="suggest-pill">✨ Suggest 1.75 / 2</span>
+                <span class="comment-mini">"Use _ as loop var"</span>
                 <span class="btn-mini">Save</span>
               </div>
             </div>
           </div>
         </article>
 
-        <!-- Screen 3: Plagiarism -->
+        <!-- Screen 3: Pair comparison -->
         <article class="screen reveal">
-          <div class="screen-tag">③  Plagiarism</div>
+          <div class="screen-tag">③  Compare</div>
           <div class="mock">
             <div class="mock-bar navy">
               <span class="dot r" /><span class="dot y" /><span class="dot g" />
-              <span class="mock-title">Plagiarism</span>
+              <span class="mock-title">Compare pair</span>
             </div>
-            <div class="mock-body plag-mock">
-              <div class="plag-stats">
-                <div class="stat"><strong>3160</strong><span>compared</span></div>
-                <div class="stat warn"><strong>7</strong><span>suspicious</span></div>
-                <div class="stat danger"><strong>2</strong><span>≥ 95%</span></div>
-              </div>
-              <div class="heatmap">
-                <div v-for="i in 7" :key="i" class="hrow">
-                  <span v-for="j in 7" :key="j"
-                    class="hcell"
-                    :style="{ background: heatColor(i, j) }" />
+            <div class="mock-body compare-mock">
+              <div class="cmp-head">
+                <div class="cmp-pair">
+                  <strong>Adam F.</strong>
+                  <span class="cmp-arrow">↔</span>
+                  <strong>Bruno S.</strong>
                 </div>
+                <span class="cmp-score danger">96%</span>
               </div>
-              <div class="plag-pair">
-                <strong>Adam F.</strong> ↔ <strong>Bruno S.</strong>
-                <span class="plag-score danger">96%</span>
+              <div class="cmp-q">
+                <code>Q4</code> <span class="cmp-q-sim">94%</span>
+                <span class="cmp-tag">⚠ Identical block</span>
+              </div>
+              <div class="cmp-codes">
+                <div class="cmp-col">
+                  <div class="cmp-line dim"><span class="kw">def</span> <span class="fn">approximate_pi</span>(N):</div>
+                  <div class="cmp-line dim">  inside = <span class="num">0</span></div>
+                  <div class="cmp-block exact">
+                    <span class="cmp-tag-mini">⚠</span>
+                    <div class="cmp-line"><span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(N):</div>
+                    <div class="cmp-line">  x = random()</div>
+                    <div class="cmp-line">  y = random()</div>
+                  </div>
+                  <div class="cmp-line dim">    inside += <span class="num">1</span></div>
+                </div>
+                <div class="cmp-col">
+                  <div class="cmp-line dim"><span class="kw">def</span> <span class="fn">approx_pi</span>(N):</div>
+                  <div class="cmp-line dim">  cnt = <span class="num">0</span></div>
+                  <div class="cmp-block exact">
+                    <span class="cmp-tag-mini">⚠</span>
+                    <div class="cmp-line"><span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(N):</div>
+                    <div class="cmp-line">  x = random()</div>
+                    <div class="cmp-line">  y = random()</div>
+                  </div>
+                  <div class="cmp-line dim">    cnt += <span class="num">1</span></div>
+                </div>
               </div>
             </div>
           </div>
@@ -298,7 +328,8 @@ onBeforeUnmount(() => {
     <!-- ==================== WHO IT'S FOR ==================== -->
     <section class="audience reveal">
       <header class="section-head">
-        <h2>Built for instructors who care about their students' privacy</h2>
+        <h2>Built for the realities of teaching</h2>
+        <p>Three kinds of instructors keep us honest about what this tool needs to do.</p>
       </header>
       <div class="personas">
         <article>
@@ -316,26 +347,6 @@ onBeforeUnmount(() => {
           <h3>Teaching assistants</h3>
           <p>You probably can't put student data on a third-party SaaS even if you wanted to. With this tool you don't have to ask — files literally cannot leave your machine.</p>
         </article>
-      </div>
-    </section>
-
-    <!-- ==================== PRIVACY CARD ==================== -->
-    <section class="privacy reveal">
-      <div class="privacy-card">
-        <div class="ico">🔐</div>
-        <div>
-          <h3>What "no uploads" actually means</h3>
-          <p>
-            The page you're reading is fully static. When you pick a file with the file
-            picker, the browser hands the bytes to Pyodide — a Python runtime compiled to
-            WebAssembly — that lives in this same tab. There is no API call, no cookie,
-            no analytics, and no copy of your students' work outside your machine.
-          </p>
-          <p class="micro">
-            We don't <em>promise</em> not to upload your files — we made sure we
-            <em>cannot</em>.
-          </p>
-        </div>
       </div>
     </section>
 
@@ -401,8 +412,8 @@ onBeforeUnmount(() => {
 
     <!-- ==================== FINAL CTA ==================== -->
     <section class="final-cta reveal">
-      <h2>Ready?</h2>
-      <p>Open the workspace — your files don't go anywhere they shouldn't.</p>
+      <h2>Ready when you are.</h2>
+      <p>Drop a solution, drop a zip, start grading.</p>
       <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
     </section>
 
@@ -417,28 +428,6 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<script lang="ts">
-// Tiny pseudo-random heatmap colour for the marketing mockup; deterministic
-// so the page renders identically on every visit.
-function heatColor(i: number, j: number): string {
-  if (j > i) return 'transparent'
-  const v = ((i * 7 + j * 13) % 17) / 17
-  const t = i === j ? 0.95 : v
-  if (t < 0.5) {
-    const k = t / 0.5
-    const r = Math.round(46 + (243 - 46) * k)
-    const g = Math.round(204 + (156 - 204) * k)
-    const b = Math.round(113 + (18 - 113) * k)
-    return `rgb(${r},${g},${b})`
-  }
-  const k = (t - 0.5) / 0.5
-  const r = Math.round(243 + (231 - 243) * k)
-  const g = Math.round(156 + (76 - 156) * k)
-  const b = Math.round(18 + (60 - 18) * k)
-  return `rgb(${r},${g},${b})`
-}
-export default { methods: { heatColor } }
-</script>
 
 <style scoped>
 .landing {
@@ -626,36 +615,6 @@ export default { methods: { heatColor } }
 .qchip.on { background: #2563eb; color: white; }
 .grade-score { margin-left: auto; color: #6ee7b7; font-weight: 600; }
 
-/* trust strip below hero */
-.trust-strip {
-  max-width: 1100px;
-  margin: 3rem auto 0;
-  position: relative; z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  backdrop-filter: blur(4px);
-}
-.trust-strip > div {
-  text-align: center;
-  display: flex; flex-direction: column; gap: 0.15rem;
-}
-.trust-strip strong {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: white;
-  font-variant-numeric: tabular-nums;
-}
-.trust-strip span {
-  font-size: 0.78rem;
-  color: rgba(255,255,255,0.65);
-  letter-spacing: 0.2px;
-}
-
 /* ==================== Section heads ==================== */
 .section-head { max-width: 720px; margin: 0 auto 2.2rem; text-align: center; }
 .section-head h2 {
@@ -723,10 +682,55 @@ export default { methods: { heatColor } }
 .mock-body { padding: 0.85rem; min-height: 280px; }
 
 /* Screen 1: Setup */
-.setup-mock { display: flex; flex-direction: column; gap: 0.4rem; }
-.setup-mock .step { font-size: 0.82rem; color: var(--text-muted); }
-.setup-mock .step.done { color: var(--success); }
-.setup-mock .step:last-child { color: var(--accent); border: 1px dashed var(--accent); padding: 0.4rem 0.6rem; border-radius: 6px; text-align: center; }
+.setup-mock { display: flex; flex-direction: column; gap: 0.5rem; }
+.filebox {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--success-soft);
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.filebox .ico { font-size: 1rem; }
+.filebox .fname { font-family: ui-monospace, monospace; font-weight: 500; }
+.filebox .ftag {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--success);
+  background: white;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.meta-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.meta-row .pill {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.meta-row .pill.ok {
+  background: var(--accent-soft);
+  color: #1e40af;
+  border-color: #bfdbfe;
+  font-weight: 600;
+}
+.dropzone {
+  margin-top: 0.2rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  text-align: center;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 500;
+  background: var(--accent-soft);
+}
 .qrow {
   display: grid;
   grid-template-columns: 18px 60px 1fr 36px;
@@ -760,8 +764,25 @@ export default { methods: { heatColor } }
 
 /* Screen 2: Grading */
 .grading-mock { display: flex; flex-direction: column; gap: 0.55rem; }
-.g-top { font-size: 0.85rem; color: var(--text); }
-.g-top strong { color: var(--accent); margin-left: 0.3rem; }
+.g-top {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--bg-soft);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+}
+.g-nav {
+  width: 24px; height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: white;
+  color: var(--text);
+  font-size: 0.85rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: default;
+}
+.g-name { flex: 1; display: flex; flex-direction: column; gap: 1px; text-align: center; }
+.g-name strong { font-size: 0.86rem; color: var(--text-strong); }
+.g-name span { font-size: 0.72rem; color: var(--text-muted); font-family: ui-monospace, monospace; }
 .g-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 .g-chips .qchip {
   display: inline-flex;
@@ -805,6 +826,16 @@ export default { methods: { heatColor } }
   font-size: 0.72rem;
   font-weight: 600;
 }
+.comment-mini {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .btn-mini {
   margin-left: auto;
   background: var(--accent); color: white;
@@ -812,39 +843,88 @@ export default { methods: { heatColor } }
   font-size: 0.75rem; font-weight: 600;
 }
 
-/* Screen 3: Plagiarism */
-.plag-mock { display: flex; flex-direction: column; gap: 0.7rem; }
-.plag-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.3rem; }
-.plag-stats .stat {
-  background: var(--bg-soft);
-  border-left: 3px solid var(--accent);
-  border-radius: 4px;
-  padding: 0.35rem 0.5rem;
-  display: flex; flex-direction: column; gap: 1px;
-}
-.plag-stats .stat.warn { border-left-color: var(--warning); }
-.plag-stats .stat.danger { border-left-color: var(--danger); }
-.plag-stats .stat strong { font-size: 1rem; color: var(--text-strong); font-variant-numeric: tabular-nums; }
-.plag-stats .stat span { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
-.heatmap {
-  display: flex; flex-direction: column; gap: 1px;
-  padding: 0.4rem;
-  background: var(--bg-soft);
-  border-radius: 4px;
-}
-.hrow { display: flex; gap: 1px; }
-.hcell { width: 18px; height: 18px; border-radius: 1px; }
-.plag-pair {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.4rem 0.55rem;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+/* Screen 3: Pair compare */
+.compare-mock { display: flex; flex-direction: column; gap: 0.55rem; }
+.cmp-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
   background: var(--danger-soft);
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+}
+.cmp-pair { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; flex: 1; }
+.cmp-pair strong { color: var(--text-strong); }
+.cmp-arrow { color: var(--text-muted); }
+.cmp-score { font-weight: 700; font-size: 1rem; }
+.cmp-score.danger { color: var(--danger); }
+.cmp-q {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  background: var(--bg-soft);
+  border-radius: 4px;
   font-size: 0.78rem;
 }
-.plag-pair strong { color: var(--text-strong); }
-.plag-pair .plag-score { margin-left: auto; font-weight: 700; }
-.plag-pair .plag-score.danger { color: var(--danger); }
+.cmp-q code {
+  background: var(--accent-soft);
+  color: #1e40af;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.cmp-q-sim { color: var(--danger); font-weight: 600; font-family: ui-monospace, monospace; }
+.cmp-tag {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--danger);
+  background: white;
+  border: 1px solid #fecaca;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.cmp-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+.cmp-col {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+}
+.cmp-line { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmp-line.dim { color: var(--text-muted); }
+.cmp-line .kw { color: #8b5cf6; }
+.cmp-line .fn { color: #d97706; }
+.cmp-line .num { color: #0d9488; }
+.cmp-block {
+  position: relative;
+  margin: 0.25rem -0.25rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+}
+.cmp-block.exact {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(239, 68, 68, 0.06));
+  border: 1.5px solid #ef4444;
+}
+.cmp-tag-mini {
+  position: absolute;
+  top: -7px;
+  right: -3px;
+  background: white;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  font-size: 0.6rem;
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 1.2;
+  font-family: system-ui, sans-serif;
+}
 
 /* ==================== Features ==================== */
 .features {
@@ -945,32 +1025,6 @@ export default { methods: { heatColor } }
 .personas article .ico { font-size: 2rem; margin-bottom: 0.6rem; }
 .personas article h3 { margin: 0 0 0.45rem; color: var(--text-strong); font-size: 1.05rem; }
 .personas article p { margin: 0; color: var(--text); font-size: 0.9rem; line-height: 1.55; }
-
-/* ==================== Privacy card ==================== */
-.privacy { padding: 4rem 1.5rem; background: var(--bg-page); }
-.privacy-card {
-  max-width: 900px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1.5rem;
-  padding: 2rem;
-  background: linear-gradient(135deg, var(--bg-card) 0%, #f0f9ff 100%);
-  border: 1px solid #bfdbfe;
-  border-radius: 14px;
-}
-.privacy-card .ico {
-  font-size: 2.4rem;
-  width: 64px; height: 64px;
-  display: flex; align-items: center; justify-content: center;
-  background: white;
-  border-radius: 14px;
-  border: 1px solid #bfdbfe;
-}
-.privacy-card h3 { margin: 0 0 0.5rem; color: var(--text-strong); font-size: 1.15rem; }
-.privacy-card p { margin: 0 0 0.7rem; color: var(--text); font-size: 0.95rem; line-height: 1.6; }
-.privacy-card .micro { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0; }
-.privacy-card em { color: var(--accent); font-style: normal; font-weight: 600; }
 
 /* ==================== FAQ ==================== */
 .faq { padding: 5rem 1.5rem; background: var(--bg-card); border-top: 1px solid var(--border); }
@@ -1074,7 +1128,6 @@ export default { methods: { heatColor } }
   .how .steps { grid-template-columns: 1fr; }
   .personas { grid-template-columns: 1fr; }
   .faq-grid { grid-template-columns: 1fr; }
-  .trust-strip { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
   .hero { padding: 1rem 1.25rem 3rem; }
@@ -1083,6 +1136,5 @@ export default { methods: { heatColor } }
   .window { transform: none; max-width: 380px; }
   .window.float { animation: none; }
   .features .grid { grid-template-columns: 1fr; }
-  .privacy-card { grid-template-columns: 1fr; }
 }
 </style>
