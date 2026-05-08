@@ -271,14 +271,14 @@ function gradeFor(qid: string): number | null {
 <template>
   <div class="page">
     <header class="appbar">
-      <div class="title">
+      <RouterLink to="/" class="title" title="Back to landing">
         <h1>📋 Assignment Grading Tool</h1>
         <span class="meta">
           {{ session.students.length }} students · {{ gradedCount }} graded ·
           {{ session.enabledQuestions.length }}<template v-if="session.questions.length !== session.enabledQuestions.length">/{{ session.questions.length }}</template>
           questions ({{ totalMax }} pts total)
         </span>
-      </div>
+      </RouterLink>
       <div class="actions">
         <button class="btn" @click="router.push('/setup')">← Setup</button>
         <button class="btn btn-primary" @click="downloadGradesCsv">📥 Export CSV</button>
@@ -514,6 +514,18 @@ function gradeFor(qid: string): number | null {
 }
 .appbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
 .appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
+.appbar .title {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+  padding: 0.25rem 0.55rem;
+  margin: -0.25rem -0.55rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
+.appbar .title:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 2px; }
 .appbar .actions { display: flex; gap: 0.5rem; }
 .appbar .btn {
   background: rgba(255,255,255,0.1);

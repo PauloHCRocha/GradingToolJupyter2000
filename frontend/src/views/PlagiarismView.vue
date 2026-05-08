@@ -250,10 +250,10 @@ async function exportFullReport() {
 <template>
   <div class="page">
     <header class="appbar">
-      <div class="title">
+      <RouterLink to="/" class="title" title="Back to landing">
         <h1>⚠ Plagiarism detection</h1>
         <span class="meta">{{ studentCount }} students loaded</span>
-      </div>
+      </RouterLink>
       <div class="actions">
         <button class="btn" @click="router.push('/grading')">← Back to grading</button>
         <button class="btn" @click="router.push('/setup')">Setup</button>
@@ -425,6 +425,18 @@ async function exportFullReport() {
 }
 .appbar h1 { margin: 0; font-size: 1.05rem; color: var(--text-strong); color: white; }
 .appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
+.appbar .title {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+  padding: 0.25rem 0.55rem;
+  margin: -0.25rem -0.55rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
+.appbar .title:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 2px; }
 .appbar .actions { display: flex; gap: 0.5rem; }
 .appbar .btn {
   background: rgba(255,255,255,0.1);

@@ -84,10 +84,10 @@ async function onContinue() {
 <template>
   <div class="page">
     <header class="appbar">
-      <div class="title">
+      <RouterLink to="/" class="title" title="Back to landing">
         <h1>📋 GradingToolJupyter2000</h1>
         <span class="meta">Configure a new grading session</span>
-      </div>
+      </RouterLink>
     </header>
 
     <main class="body">
@@ -259,7 +259,18 @@ async function onContinue() {
 }
 .appbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
 .appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
-.appbar .title { display: flex; flex-direction: column; }
+.appbar .title {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+  padding: 0.25rem 0.55rem;
+  margin: -0.25rem -0.55rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
+.appbar .title:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 2px; }
 
 /* Body */
 .body {
