@@ -127,21 +127,23 @@ onBeforeUnmount(() => {
 
     </header>
 
-    <!-- ==================== TESTIMONIAL / SPEED ==================== -->
+    <!-- ==================== SPEED CLAIM ==================== -->
     <section class="testimonial reveal">
       <div class="quote-card">
         <div class="stat">
           <strong>5×</strong>
           <span>faster grading</span>
         </div>
-        <blockquote>
-          “I graded my class in
-          <span class="hl">20% of the time</span>
-          I had originally budgeted.”
-        </blockquote>
-        <cite>
-          — Paulo Rocha, course instructor and author of the tool
-        </cite>
+        <div class="claim">
+          <h2>Notebook grading, compressed.</h2>
+          <p>
+            Question detection, grade suggestions and side-by-side review
+            handle the mechanical parts of marking — the
+            <span class="hl">potential to grade roughly 5× faster</span>
+            on a typical Python or Jupyter assignment, leaving you with
+            just the judgment calls.
+          </p>
+        </div>
       </div>
     </section>
 
@@ -675,25 +677,23 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
   text-align: center;
 }
-.quote-card blockquote {
-  margin: 0 0 0.6rem;
-  padding: 0;
-  font-size: clamp(1.05rem, 1.7vw, 1.3rem);
-  line-height: 1.5;
+.quote-card .claim h2 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: var(--text-strong);
-  font-weight: 500;
-  font-style: italic;
+  font-weight: 700;
 }
-.quote-card blockquote .hl {
+.quote-card .claim p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+.quote-card .claim .hl {
   color: var(--accent);
   font-weight: 700;
-  font-style: normal;
-}
-.quote-card cite {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-style: normal;
 }
 
 @media (max-width: 700px) {
