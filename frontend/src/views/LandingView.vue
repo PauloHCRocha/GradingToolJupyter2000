@@ -69,7 +69,7 @@ onBeforeUnmount(() => {
         <div class="hero-text">
           <div class="badge">
             <span class="dot" />
-            100% in-browser · no uploads · open source
+            100% in-browser · no uploads · zero accounts
           </div>
           <h1>
             Grade Jupyter notebooks<br>
@@ -382,7 +382,7 @@ onBeforeUnmount(() => {
           <p>
             Yes. The page is static; the only network requests it makes are to load
             Pyodide (the Python runtime) from a CDN once, and to load this page itself
-            from GitHub Pages. Nothing about your files is ever sent anywhere. You can
+            from this site. Nothing about your files is ever sent anywhere. You can
             verify this in your browser's Network tab.
           </p>
         </details>
@@ -439,12 +439,7 @@ onBeforeUnmount(() => {
     </section>
 
     <footer class="foot">
-      <p>
-        Built with Vue 3, Vite and Pyodide. Open source under MIT.
-        <a href="https://github.com/PauloHCRocha/GradingToolJupyter2000" target="_blank" rel="noopener">
-          github.com/PauloHCRocha/GradingToolJupyter2000
-        </a>
-      </p>
+      <p>GradingToolJupyter2000 · runs entirely in your browser</p>
     </footer>
   </div>
 </template>
