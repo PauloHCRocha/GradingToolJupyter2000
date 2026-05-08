@@ -427,7 +427,13 @@ async function exportFullReport() {
   display: flex; align-items: center; justify-content: space-between;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.appbar h1 { margin: 0; font-size: 1.05rem; color: var(--text-strong); color: white; }
+.appbar h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: white;
+}
 .appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
 .appbar .title {
   display: flex;

@@ -521,7 +521,12 @@ function gradeFor(qid: string): number | null {
   gap: 1rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.appbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.appbar h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
 .appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
 .appbar .title {
   display: flex;

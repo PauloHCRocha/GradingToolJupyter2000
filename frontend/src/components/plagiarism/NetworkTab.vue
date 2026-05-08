@@ -4,6 +4,7 @@ import { Network, type Options } from 'vis-network'
 import { DataSet } from 'vis-data'
 import type { ClusterInfo, SuspiciousPair } from '../../api/client'
 import { heatmapColor, NO_CLUSTER_COLOR } from './colors'
+import { theme } from '../../runtime/theme'
 
 const props = defineProps<{
   studentIds: string[]
@@ -51,6 +52,18 @@ function build() {
   const indexById: Record<string, number> = {}
   studentIds.forEach((id, i) => (indexById[id] = i))
 
+  // vis-network draws labels next to (or under) the node, so the colour
+  // has to read against the *page* background, not the node — and an
+  // outline ("stroke") keeps it legible against any cluster colour.
+  const dark = theme.value === 'dark'
+  const labelFont = {
+    color: dark ? '#f3f4f6' : '#111827',
+    size: 13,
+    face: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    strokeWidth: 3,
+    strokeColor: dark ? '#0f1419' : '#ffffff',
+  }
+
   const nodeData = Array.from(involved).map((id) => {
     const i = indexById[id]
     const cId = clusterAssignments[i] ?? -1
@@ -59,7 +72,7 @@ function build() {
       id,
       label: studentNames[i] ?? id,
       color: { background: c, border: shade(c, -0.18) },
-      font: { color: '#0f172a', size: 12 },
+      font: labelFont,
     }
   })
   const edgeData = pairs.map((p, idx) => ({
@@ -133,8 +146,13 @@ function destroyNetwork() {
   }
 }
 
-// Rebuild whenever the inputs change.
-watch(() => [props.pairs, props.studentIds, props.clusterAssignments, props.clusters] as const, build, { deep: true })
+// Rebuild whenever the inputs change. Theme changes also force a
+// rebuild so the label colour / stroke updates without a manual refresh.
+watch(
+  () => [props.pairs, props.studentIds, props.clusterAssignments, props.clusters, theme.value] as const,
+  build,
+  { deep: true },
+)
 
 onMounted(build)
 onBeforeUnmount(destroyNetwork)

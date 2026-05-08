@@ -488,7 +488,11 @@ onBeforeUnmount(() => {
   max-width: 1200px; margin: 0 auto 3rem;
   position: relative; z-index: 1;
 }
-.topnav .logo { font-size: 1rem; font-weight: 600; }
+.topnav .logo {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
 .topnav-actions { display: flex; gap: 0.5rem; align-items: center; }
 
 .hero-inner {
