@@ -273,7 +273,7 @@ function gradeFor(qid: string): number | null {
   <div class="page">
     <header class="appbar">
       <RouterLink to="/" class="title" title="Back to landing">
-        <h1>🪐 Ganymede</h1>
+        <h1>🪐 Granymede</h1>
         <span class="meta">
           Grading ·
           {{ session.students.length }} students · {{ gradedCount }} graded ·

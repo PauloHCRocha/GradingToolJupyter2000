@@ -86,7 +86,7 @@ async function onContinue() {
   <div class="page">
     <header class="appbar">
       <RouterLink to="/" class="title" title="Back to landing">
-        <h1>🪐 Ganymede</h1>
+        <h1>🪐 Granymede</h1>
         <span class="meta">Setup · configure a new grading session</span>
       </RouterLink>
       <ThemeToggle />

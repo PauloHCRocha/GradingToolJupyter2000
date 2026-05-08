@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
     <!-- ==================== HERO ==================== -->
     <header class="hero">
       <nav class="topnav">
-        <span class="logo">🪐 Ganymede</span>
+        <span class="logo">🪐 Granymede</span>
         <div class="topnav-actions">
           <ThemeToggle />
         </div>
@@ -436,7 +436,7 @@ onBeforeUnmount(() => {
     </section>
 
     <footer class="foot">
-      <p>Ganymede · grading for Jupyter notebooks, in your browser</p>
+      <p>Granymede · grading for Jupyter notebooks, in your browser</p>
     </footer>
   </div>
 </template>

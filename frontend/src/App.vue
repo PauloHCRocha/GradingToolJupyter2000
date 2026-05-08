@@ -35,7 +35,7 @@ const stageLabel: Record<string, string> = {
     <div v-if="showBoot" class="boot-overlay">
       <div class="boot-card">
         <div class="boot-icon">🪐</div>
-        <h1>Ganymede</h1>
+        <h1>Granymede</h1>
         <p class="lead">
           The whole tool runs <strong>inside your browser</strong>.
           Student files <strong>never leave your machine</strong>.
