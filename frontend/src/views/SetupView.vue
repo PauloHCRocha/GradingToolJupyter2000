@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { analyzeSolution, uploadSubmissions } from '../api/client'
 import { useSessionStore } from '../stores/session'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -88,6 +89,7 @@ async function onContinue() {
         <h1>📋 GradingToolJupyter2000</h1>
         <span class="meta">Configure a new grading session</span>
       </RouterLink>
+      <ThemeToggle />
     </header>
 
     <main class="body">

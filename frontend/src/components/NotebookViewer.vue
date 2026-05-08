@@ -62,7 +62,7 @@ const renderedCells = computed(() =>
 .cell.code { border-left: 3px solid var(--success); }
 .cell.output {
   border-left: 3px solid var(--warning);
-  background: #fffaf0;
+  background: var(--output-bg);
   /* Tighter coupling to the code card above it. */
   margin-top: -0.35rem;
 }
@@ -77,7 +77,7 @@ const renderedCells = computed(() =>
   border-bottom: 1px solid var(--border);
 }
 .cell.output .cell-head {
-  color: #b45309;
+  color: var(--output-label);
   background: rgba(245, 158, 11, 0.08);
   border-bottom-color: rgba(245, 158, 11, 0.25);
   font-weight: 600;
@@ -120,7 +120,7 @@ pre.output-body {
   margin: 0;
   padding: 0.55rem 0.85rem;
   background: transparent;
-  color: #6b4519;
+  color: var(--output-text);
   font-size: 0.82rem;
   line-height: 1.5;
   white-space: pre-wrap;

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { runtimeStage } from '../runtime/pyodide'
 import LandingIcon from '../components/LandingIcon.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const router = useRouter()
 
@@ -58,11 +59,9 @@ onBeforeUnmount(() => {
     <header class="hero">
       <nav class="topnav">
         <span class="logo">📋 GradingToolJupyter2000</span>
-        <a class="nav-link" href="https://github.com/PauloHCRocha/GradingToolJupyter2000"
-           target="_blank" rel="noopener">
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
-        </a>
+        <div class="topnav-actions">
+          <ThemeToggle />
+        </div>
       </nav>
 
       <div class="hero-inner">
@@ -82,8 +81,6 @@ onBeforeUnmount(() => {
           </p>
           <div class="cta-row">
             <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
-            <a class="btn ghost big" href="https://github.com/PauloHCRocha/GradingToolJupyter2000"
-               target="_blank" rel="noopener">★ View on GitHub</a>
           </div>
           <p class="micro">
             <span v-if="runtimeStage === 'ready'" class="ok">✓ Runtime ready — opens instantly.</span>
@@ -492,17 +489,7 @@ onBeforeUnmount(() => {
   position: relative; z-index: 1;
 }
 .topnav .logo { font-size: 1rem; font-weight: 600; }
-.topnav .nav-link {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  color: rgba(255,255,255,0.85);
-  font-size: 0.88rem;
-  padding: 0.45rem 0.85rem;
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 6px;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-.topnav .nav-link:hover { background: rgba(255,255,255,0.1); text-decoration: none; }
+.topnav-actions { display: flex; gap: 0.5rem; align-items: center; }
 
 .hero-inner {
   max-width: 1200px;

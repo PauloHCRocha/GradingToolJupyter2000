@@ -6,6 +6,7 @@ import { downloadGradesCsv, runCode, suggestGrade } from '../api/client'
 import type { CellOut, RunCodeResponse, SuggestResponse } from '../api/client'
 import NotebookViewer from '../components/NotebookViewer.vue'
 import CodeEditor from '../components/CodeEditor.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const session = useSessionStore()
 const router = useRouter()
@@ -283,11 +284,14 @@ function gradeFor(qid: string): number | null {
         <button class="btn" @click="router.push('/setup')">← Setup</button>
         <button class="btn btn-primary" @click="downloadGradesCsv">📥 Export CSV</button>
         <button class="btn btn-warn" @click="router.push('/plagiarism')">⚠ Plagiarism</button>
+        <ThemeToggle />
       </div>
     </header>
 
     <nav class="topnav">
-      <button class="btn nav-btn" @click="session.navigate(-1).then(syncDraft)">← Previous</button>
+      <button class="btn nav-btn" @click="session.navigate(-1).then(syncDraft)">
+        <kbd>←</kbd> Previous
+      </button>
       <div class="cur-student">
         <span v-if="session.studentDetail" class="cs-name">
           {{ session.studentDetail.info.name }}
@@ -297,8 +301,13 @@ function gradeFor(qid: string): number | null {
           <code>{{ session.studentDetail.info.filename }}</code>
         </span>
         <span v-else class="cs-meta muted">No student selected</span>
+        <span class="kbd-hint">
+          Use <kbd>←</kbd><kbd>→</kbd> to switch students
+        </span>
       </div>
-      <button class="btn nav-btn" @click="session.navigate(+1).then(syncDraft)">Next →</button>
+      <button class="btn nav-btn" @click="session.navigate(+1).then(syncDraft)">
+        Next <kbd>→</kbd>
+      </button>
     </nav>
 
     <main class="body">
@@ -323,7 +332,6 @@ function gradeFor(qid: string): number | null {
               <template v-if="s.has_error">⚠ error</template>
             </option>
           </select>
-          <p class="hint">Tip: use ← / → keys to navigate.</p>
           <div v-if="session.studentDetail?.invisible_findings.length" class="alert warn">
             ⚠ <strong>{{ session.studentDetail.invisible_findings.length }}</strong>
             suspicious unicode character(s) detected in code (possible AI paste).

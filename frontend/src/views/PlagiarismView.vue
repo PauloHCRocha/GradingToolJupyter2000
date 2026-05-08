@@ -32,6 +32,7 @@ import HeatmapTab from '../components/plagiarism/HeatmapTab.vue'
 import ClustersTab from '../components/plagiarism/ClustersTab.vue'
 import PairsTab from '../components/plagiarism/PairsTab.vue'
 import CompareModal from '../components/plagiarism/CompareModal.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 // Heavy chunks loaded only when actually used.
 //   - vis-network is ~600KB; only the Network tab needs it.
@@ -257,6 +258,7 @@ async function exportFullReport() {
       <div class="actions">
         <button class="btn" @click="router.push('/grading')">← Back to grading</button>
         <button class="btn" @click="router.push('/setup')">Setup</button>
+        <ThemeToggle />
       </div>
     </header>
 

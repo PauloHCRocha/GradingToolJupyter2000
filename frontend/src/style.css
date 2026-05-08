@@ -26,12 +26,87 @@
   --code-bg: #f6f8fa;
   --code-border: #e5e7eb;
 
+  /* For tokens that need a slightly different value in dark mode but
+     don't deserve a full custom property. Light mode keeps the
+     ambers/peachy backgrounds; dark mode tones them down. */
+  --output-bg: #fffaf0;
+  --output-text: #6b4519;
+  --output-label: #b45309;
+
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   color: var(--text);
   background: var(--bg-page);
   color-scheme: light;
 }
+
+/* ==================== Dark mode ==================== */
+:root[data-theme="dark"] {
+  --bg-page: #0f1419;
+  --bg-card: #181d27;
+  --bg-soft: #1f2530;
+  --bg-input: #11151c;
+  --border: #2a3142;
+  --border-strong: #3a4458;
+  --text: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-strong: #f3f4f6;
+
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-soft: rgba(96, 165, 250, 0.18);
+  --header-bg: #0a0f17;
+  --header-text: #f3f4f6;
+
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.18);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.18);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.18);
+  --suggest: #f59e0b;
+
+  --code-bg: #0d1117;
+  --code-border: #2a3142;
+
+  --output-bg: rgba(245, 158, 11, 0.07);
+  --output-text: #fcd34d;
+  --output-label: #fbbf24;
+
+  color-scheme: dark;
+}
+
+/* highlight.js token colours when dark mode is active. The base hljs
+   stylesheet (github.css) is imported by NotebookViewer / CodeEditor /
+   CompareModal in scoped blocks; these selectors here are global so
+   they win specificity-wise via the :root[data-theme] cascade. */
+:root[data-theme="dark"] .hljs { color: #d4d4d4; background: transparent; }
+:root[data-theme="dark"] .hljs-comment,
+:root[data-theme="dark"] .hljs-quote { color: #6a9955; font-style: italic; }
+:root[data-theme="dark"] .hljs-keyword,
+:root[data-theme="dark"] .hljs-selector-tag,
+:root[data-theme="dark"] .hljs-literal,
+:root[data-theme="dark"] .hljs-meta-keyword { color: #c586c0; }
+:root[data-theme="dark"] .hljs-string,
+:root[data-theme="dark"] .hljs-title.string,
+:root[data-theme="dark"] .hljs-meta-string { color: #ce9178; }
+:root[data-theme="dark"] .hljs-number,
+:root[data-theme="dark"] .hljs-symbol,
+:root[data-theme="dark"] .hljs-bullet { color: #b5cea8; }
+:root[data-theme="dark"] .hljs-built_in,
+:root[data-theme="dark"] .hljs-builtin-name,
+:root[data-theme="dark"] .hljs-type { color: #4ec9b0; }
+:root[data-theme="dark"] .hljs-function,
+:root[data-theme="dark"] .hljs-title.function,
+:root[data-theme="dark"] .hljs-title { color: #dcdcaa; }
+:root[data-theme="dark"] .hljs-variable,
+:root[data-theme="dark"] .hljs-attr,
+:root[data-theme="dark"] .hljs-attribute { color: #9cdcfe; }
+:root[data-theme="dark"] .hljs-params { color: #d4d4d4; }
+:root[data-theme="dark"] .hljs-decorator,
+:root[data-theme="dark"] .hljs-meta { color: #d7ba7d; }
+:root[data-theme="dark"] .hljs-operator,
+:root[data-theme="dark"] .hljs-punctuation { color: #d4d4d4; }
 
 body {
   margin: 0;
@@ -89,3 +164,34 @@ input:focus, textarea:focus, select:focus {
 }
 .btn-suggest:hover:not(:disabled) { background: #b45309; border-color: #b45309; }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* keyboard hint chip — used in the grading top nav to surface the ←/→
+   shortcut. Renders well over both light and navy backgrounds. */
+kbd {
+  display: inline-block;
+  padding: 1px 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  line-height: 1.2;
+  min-width: 1.5em;
+  text-align: center;
+}
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+:where(.appbar, .topnav) kbd {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+:where(.appbar, .topnav) .kbd-hint { color: rgba(255, 255, 255, 0.7); }
