@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { runtimeStage } from '../runtime/pyodide'
 
@@ -23,15 +23,42 @@ const ctaLabel = computed(() => {
 function go() {
   router.push('/setup')
 }
+
+// --- Reveal-on-scroll ----------------------------------------------------
+// IntersectionObserver toggles the `in-view` class once a section enters
+// the viewport. Single observer instance, disconnected on unmount.
+let io: IntersectionObserver | null = null
+onMounted(() => {
+  if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
+  io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('in-view')
+          io?.unobserve(e.target)
+        }
+      }
+    },
+    { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
+  )
+  for (const el of document.querySelectorAll('.reveal')) {
+    io.observe(el)
+  }
+})
+onBeforeUnmount(() => {
+  io?.disconnect()
+  io = null
+})
 </script>
 
 <template>
   <div class="landing">
-    <!-- Hero -->
+    <!-- ==================== HERO ==================== -->
     <header class="hero">
       <nav class="topnav">
         <span class="logo">📋 GradingToolJupyter2000</span>
-        <a class="nav-link" href="https://github.com/PauloHCRocha/GradingToolJupyter2000" target="_blank" rel="noopener">
+        <a class="nav-link" href="https://github.com/PauloHCRocha/GradingToolJupyter2000"
+           target="_blank" rel="noopener">
           <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
           GitHub
         </a>
@@ -49,7 +76,8 @@ function go() {
           </h1>
           <p class="lead">
             A simple, private grading workspace for Python and Jupyter assignments.
-            Your students' files never leave your browser. There is no server.
+            Your students' files never leave your browser. There is no server,
+            no account, and nothing is sent anywhere.
           </p>
           <div class="cta-row">
             <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
@@ -64,7 +92,7 @@ function go() {
         </div>
 
         <div class="hero-art" aria-hidden="true">
-          <div class="window">
+          <div class="window float">
             <div class="win-bar">
               <span class="dot r" />
               <span class="dot y" />
@@ -96,13 +124,118 @@ function go() {
           </div>
         </div>
       </div>
+
+      <!-- Trust strip — quick reassurance after the hero CTA. -->
+      <div class="trust-strip">
+        <div><strong>0</strong><span>servers touched</span></div>
+        <div><strong>0</strong><span>accounts to create</span></div>
+        <div><strong>∞</strong><span>students per session</span></div>
+        <div><strong>~6 MB</strong><span>once-cached runtime</span></div>
+      </div>
     </header>
 
-    <!-- Features -->
-    <section class="features">
+    <!-- ==================== WORKFLOW PREVIEW ==================== -->
+    <section class="workflow reveal">
       <header class="section-head">
-        <h2>Everything in one page, nothing uploaded</h2>
-        <p>The whole grading pipeline runs as Python in your browser via Pyodide.</p>
+        <h2>Three screens, one private session</h2>
+        <p>From dropping the solution to flagging suspicious pairs — all in your tab.</p>
+      </header>
+
+      <div class="screens">
+        <!-- Screen 1: Setup -->
+        <article class="screen reveal">
+          <div class="screen-tag">①  Setup</div>
+          <div class="mock">
+            <div class="mock-bar">
+              <span class="dot r" /><span class="dot y" /><span class="dot g" />
+              <span class="mock-title">Setup</span>
+            </div>
+            <div class="mock-body setup-mock">
+              <div class="step done">✓ Solution uploaded</div>
+              <div class="step done">✓ 8 questions detected · 20 pts total</div>
+              <div class="qrow"><span class="check on">✓</span><code>Q1-1</code><span class="bar"><i style="width: 40%" /></span><span class="pts">2 pt</span></div>
+              <div class="qrow"><span class="check on">✓</span><code>Q1-2</code><span class="bar"><i style="width: 40%" /></span><span class="pts">2 pt</span></div>
+              <div class="qrow"><span class="check on">✓</span><code>Q2</code><span class="bar"><i style="width: 70%" /></span><span class="pts">8 pt</span></div>
+              <div class="qrow off"><span class="check">✗</span><code>Q4</code><span class="bar"><i style="width: 30%" /></span><span class="pts">3 pt</span></div>
+              <div class="step">Drop submissions.zip ↓</div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Screen 2: Grading -->
+        <article class="screen reveal">
+          <div class="screen-tag">②  Grading</div>
+          <div class="mock">
+            <div class="mock-bar navy">
+              <span class="dot r" /><span class="dot y" /><span class="dot g" />
+              <span class="mock-title">Grading workspace</span>
+            </div>
+            <div class="mock-body grading-mock">
+              <div class="g-top">Alice Martin · #10001 · <strong>14 / 20</strong></div>
+              <div class="g-chips">
+                <span class="qchip done">Q1-1</span>
+                <span class="qchip done">Q1-2</span>
+                <span class="qchip active">Q2</span>
+                <span class="qchip">Q3</span>
+              </div>
+              <div class="g-pane">
+                <div class="g-col solution">
+                  <div class="lbl">Solution</div>
+                  <div class="g-line"><span class="kw">def</span> <span class="fn">approximate_pi</span>(n):</div>
+                  <div class="g-line">  inside = <span class="num">0</span></div>
+                  <div class="g-line">  <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(n):</div>
+                </div>
+                <div class="g-col student">
+                  <div class="lbl">Student</div>
+                  <div class="g-line"><span class="kw">def</span> <span class="fn">approximate_pi</span>(N):</div>
+                  <div class="g-line">  hit = <span class="num">0</span></div>
+                  <div class="g-line">  <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(N):</div>
+                </div>
+              </div>
+              <div class="g-actions">
+                <span class="suggest-pill">✨ Suggest 1.75 / 2</span>
+                <span class="btn-mini">Save</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Screen 3: Plagiarism -->
+        <article class="screen reveal">
+          <div class="screen-tag">③  Plagiarism</div>
+          <div class="mock">
+            <div class="mock-bar navy">
+              <span class="dot r" /><span class="dot y" /><span class="dot g" />
+              <span class="mock-title">Plagiarism</span>
+            </div>
+            <div class="mock-body plag-mock">
+              <div class="plag-stats">
+                <div class="stat"><strong>3160</strong><span>compared</span></div>
+                <div class="stat warn"><strong>7</strong><span>suspicious</span></div>
+                <div class="stat danger"><strong>2</strong><span>≥ 95%</span></div>
+              </div>
+              <div class="heatmap">
+                <div v-for="i in 7" :key="i" class="hrow">
+                  <span v-for="j in 7" :key="j"
+                    class="hcell"
+                    :style="{ background: heatColor(i, j) }" />
+                </div>
+              </div>
+              <div class="plag-pair">
+                <strong>Adam F.</strong> ↔ <strong>Bruno S.</strong>
+                <span class="plag-score danger">96%</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ==================== FEATURES ==================== -->
+    <section class="features reveal">
+      <header class="section-head">
+        <h2>Built for the way you actually grade</h2>
+        <p>Six things you'd hand-roll if you had the time. They're already here.</p>
       </header>
       <div class="grid">
         <article>
@@ -123,7 +256,7 @@ function go() {
         <article>
           <div class="ico">🛡️</div>
           <h3>Plagiarism detection</h3>
-          <p>Hybrid similarity (TF-IDF + AST + token Jaccard) surfaces suspicious pairs and a full similarity matrix.</p>
+          <p>Hybrid similarity (TF-IDF + AST + token Jaccard) surfaces suspicious pairs, clusters and a full similarity matrix.</p>
         </article>
         <article>
           <div class="ico">▶️</div>
@@ -138,8 +271,8 @@ function go() {
       </div>
     </section>
 
-    <!-- How it works -->
-    <section class="how">
+    <!-- ==================== HOW IT WORKS ==================== -->
+    <section class="how reveal">
       <header class="section-head">
         <h2>Three steps to a graded class</h2>
       </header>
@@ -147,7 +280,7 @@ function go() {
         <li>
           <span class="num">1</span>
           <h3>Upload your solution</h3>
-          <p>A <code>.ipynb</code> or <code>.py</code> with the reference answers. Questions and points are detected automatically.</p>
+          <p>A <code>.ipynb</code> or <code>.py</code> with the reference answers. Questions and points are detected automatically. Untick the ones you're not grading this round.</p>
         </li>
         <li>
           <span class="num">2</span>
@@ -157,13 +290,37 @@ function go() {
         <li>
           <span class="num">3</span>
           <h3>Grade, suggest, export</h3>
-          <p>Review side-by-side, accept the suggested grade or override, leave a comment, and export the gradebook as CSV.</p>
+          <p>Review side-by-side, accept the suggested grade or override, leave a comment, run the student's code in a sandbox, and export the gradebook as CSV.</p>
         </li>
       </ol>
     </section>
 
-    <!-- Privacy block -->
-    <section class="privacy">
+    <!-- ==================== WHO IT'S FOR ==================== -->
+    <section class="audience reveal">
+      <header class="section-head">
+        <h2>Built for instructors who care about their students' privacy</h2>
+      </header>
+      <div class="personas">
+        <article>
+          <div class="ico">🎓</div>
+          <h3>University professors</h3>
+          <p>Got a class of 80 Jupyter notebooks every assignment? Don't ship them through someone else's cloud. Run the whole grading workflow in your laptop's browser.</p>
+        </article>
+        <article>
+          <div class="ico">⚡</div>
+          <h3>Bootcamp instructors</h3>
+          <p>Tight turnarounds, lots of submissions. The dynamic question detector and the multi-criteria suggester get you 60% of the grade in 0% of the time.</p>
+        </article>
+        <article>
+          <div class="ico">🛡️</div>
+          <h3>Teaching assistants</h3>
+          <p>You probably can't put student data on a third-party SaaS even if you wanted to. With this tool you don't have to ask — files literally cannot leave your machine.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ==================== PRIVACY CARD ==================== -->
+    <section class="privacy reveal">
       <div class="privacy-card">
         <div class="ico">🔐</div>
         <div>
@@ -182,8 +339,68 @@ function go() {
       </div>
     </section>
 
-    <!-- Final CTA -->
-    <section class="final-cta">
+    <!-- ==================== FAQ ==================== -->
+    <section class="faq reveal">
+      <header class="section-head">
+        <h2>Frequently asked, briefly answered</h2>
+      </header>
+      <div class="faq-grid">
+        <details>
+          <summary>Is my students' data really private?</summary>
+          <p>
+            Yes. The page is static; the only network requests it makes are to load
+            Pyodide (the Python runtime) from a CDN once, and to load this page itself
+            from GitHub Pages. Nothing about your files is ever sent anywhere. You can
+            verify this in your browser's Network tab.
+          </p>
+        </details>
+        <details>
+          <summary>How big can the submissions zip be?</summary>
+          <p>
+            Whatever your browser can hold in RAM. ~80 student notebooks (a few MB of
+            zip) work comfortably on any modern laptop. Multiple hundreds get sluggish
+            on the plagiarism step because the similarity matrix grows quadratically.
+          </p>
+        </details>
+        <details>
+          <summary>Can I run the student's code? Is that safe?</summary>
+          <p>
+            Yes — the runner uses Pyodide's WebAssembly sandbox, which is the same
+            isolation the browser gives every page. The student's code can't touch
+            your filesystem, your microphone, or anything else outside the tab.
+          </p>
+        </details>
+        <details>
+          <summary>What if my solution doesn't follow the "Question N" pattern?</summary>
+          <p>
+            The detector picks up <code>Question N</code>, <code>QN</code>,
+            <code>QN-M</code> with optional points like <code>(2 points)</code>. If
+            your file doesn't, you'll see no questions detected — adjust your markdown
+            or paste a renamed copy. You can also untick auto-detected ones you don't
+            want to grade.
+          </p>
+        </details>
+        <details>
+          <summary>Does it work for plain <code>.py</code> files?</summary>
+          <p>
+            Yes. The same flow handles <code>.py</code> sources — the question
+            detector reads docstrings and comments instead of markdown cells.
+          </p>
+        </details>
+        <details>
+          <summary>What gets cached and where?</summary>
+          <p>
+            Pyodide and a few JavaScript chunks are cached by the browser (HTTP
+            cache) on first visit, so subsequent loads are instant. Your files,
+            grades and plagiarism results live only in the tab's memory and are
+            wiped when you close it.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ==================== FINAL CTA ==================== -->
+    <section class="final-cta reveal">
       <h2>Ready?</h2>
       <p>Open the workspace — your files don't go anywhere they shouldn't.</p>
       <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
@@ -200,6 +417,29 @@ function go() {
   </div>
 </template>
 
+<script lang="ts">
+// Tiny pseudo-random heatmap colour for the marketing mockup; deterministic
+// so the page renders identically on every visit.
+function heatColor(i: number, j: number): string {
+  if (j > i) return 'transparent'
+  const v = ((i * 7 + j * 13) % 17) / 17
+  const t = i === j ? 0.95 : v
+  if (t < 0.5) {
+    const k = t / 0.5
+    const r = Math.round(46 + (243 - 46) * k)
+    const g = Math.round(204 + (156 - 204) * k)
+    const b = Math.round(113 + (18 - 113) * k)
+    return `rgb(${r},${g},${b})`
+  }
+  const k = (t - 0.5) / 0.5
+  const r = Math.round(243 + (231 - 243) * k)
+  const g = Math.round(156 + (76 - 156) * k)
+  const b = Math.round(18 + (60 - 18) * k)
+  return `rgb(${r},${g},${b})`
+}
+export default { methods: { heatColor } }
+</script>
+
 <style scoped>
 .landing {
   background: var(--bg-page);
@@ -207,14 +447,26 @@ function go() {
   min-height: 100vh;
 }
 
-/* ---------- HERO ---------- */
+/* ---------- Reveal-on-scroll ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.in-view { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ==================== HERO ==================== */
 .hero {
   background:
-    radial-gradient(circle at 80% 20%, rgba(37, 99, 235, 0.18), transparent 55%),
-    radial-gradient(circle at 10% 80%, rgba(99, 102, 241, 0.12), transparent 55%),
-    linear-gradient(135deg, #1e3a5f 0%, #2c4a72 100%);
+    radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.20), transparent 55%),
+    radial-gradient(circle at 10% 80%, rgba(139, 92, 246, 0.16), transparent 55%),
+    radial-gradient(circle at 50% 110%, rgba(236, 72, 153, 0.10), transparent 60%),
+    linear-gradient(135deg, #1e3a5f 0%, #2c4a72 60%, #1e293b 100%);
   color: white;
-  padding: 1rem 1.5rem 5rem;
+  padding: 1rem 1.5rem 4rem;
   position: relative;
   overflow: hidden;
 }
@@ -230,13 +482,9 @@ function go() {
 }
 
 .topnav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1200px;
-  margin: 0 auto 3rem;
-  position: relative;
-  z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 1200px; margin: 0 auto 3rem;
+  position: relative; z-index: 1;
 }
 .topnav .logo { font-size: 1rem; font-weight: 600; }
 .topnav .nav-link {
@@ -258,20 +506,16 @@ function go() {
   grid-template-columns: 1.1fr 1fr;
   gap: 3rem;
   align-items: center;
-  position: relative;
-  z-index: 1;
+  position: relative; z-index: 1;
 }
 
 .hero-text .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
+  display: inline-flex; align-items: center; gap: 0.45rem;
   background: rgba(255,255,255,0.1);
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 999px;
   padding: 0.3rem 0.85rem;
   font-size: 0.78rem;
-  color: rgba(255,255,255,0.92);
   margin-bottom: 1.4rem;
 }
 .hero-text .badge .dot {
@@ -280,20 +524,17 @@ function go() {
   box-shadow: 0 0 10px #6ee7b7;
   animation: pulse 2s ease-in-out infinite;
 }
-@keyframes pulse {
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
+@keyframes pulse { 50% { opacity: 0.4; transform: scale(0.8); } }
 
 .hero-text h1 {
-  font-size: clamp(2rem, 4.5vw, 3.4rem);
-  line-height: 1.1;
+  font-size: clamp(2.1rem, 4.6vw, 3.6rem);
+  line-height: 1.05;
   margin: 0 0 1.2rem;
-  color: white;
-  letter-spacing: -0.02em;
-  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-weight: 750;
 }
 .hero-text h1 .accent {
-  background: linear-gradient(120deg, #93c5fd 0%, #c4b5fd 100%);
+  background: linear-gradient(120deg, #93c5fd 0%, #c4b5fd 50%, #f0abfc 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -301,20 +542,15 @@ function go() {
 
 .hero-text .lead {
   font-size: 1.1rem;
-  line-height: 1.55;
-  color: rgba(255,255,255,0.85);
+  line-height: 1.6;
+  color: rgba(255,255,255,0.86);
   margin: 0 0 1.8rem;
-  max-width: 540px;
+  max-width: 560px;
 }
 
-.cta-row {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-}
+.cta-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .btn.big {
-  padding: 0.75rem 1.4rem;
+  padding: 0.78rem 1.5rem;
   font-size: 1rem;
   border-radius: 8px;
   font-weight: 600;
@@ -323,33 +559,29 @@ function go() {
   gap: 0.4rem;
 }
 .btn.big.btn-primary {
-  background: #ffffff;
+  background: white;
   color: #1e3a5f;
   border: none;
   box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  transition: transform 0.12s, box-shadow 0.15s;
 }
-.btn.big.btn-primary:hover { background: #f1f5f9; }
+.btn.big.btn-primary:hover { background: #f1f5f9; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.22); }
 .btn.big.ghost {
   background: rgba(255,255,255,0.08);
   color: white;
   border: 1px solid rgba(255,255,255,0.25);
   text-decoration: none;
 }
-.btn.big.ghost:hover { background: rgba(255,255,255,0.16); text-decoration: none; }
+.btn.big.ghost:hover { background: rgba(255,255,255,0.18); text-decoration: none; }
 
-.micro {
-  font-size: 0.82rem;
-  color: rgba(255,255,255,0.65);
-  margin: 0.4rem 0 0;
-}
+.micro { font-size: 0.82rem; color: rgba(255,255,255,0.65); margin: 0.4rem 0 0; }
 .micro .ok { color: #6ee7b7; }
 .micro .warn { color: #fca5a5; }
 
-/* hero art (decorative window) */
+/* hero mockup window */
 .hero-art { display: flex; justify-content: center; }
 .window {
-  width: 100%;
-  max-width: 460px;
+  width: 100%; max-width: 460px;
   background: #0f1d31;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.12);
@@ -357,6 +589,11 @@ function go() {
   overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   transform: rotate(-1deg);
+}
+.window.float { animation: float 6s ease-in-out infinite; }
+@keyframes float {
+  0%, 100% { transform: rotate(-1deg) translateY(0); }
+  50%      { transform: rotate(-1deg) translateY(-6px); }
 }
 .win-bar {
   display: flex; align-items: center; gap: 0.45rem;
@@ -368,69 +605,253 @@ function go() {
 .win-bar .dot.r { background: #ef4444; }
 .win-bar .dot.y { background: #f59e0b; }
 .win-bar .dot.g { background: #22c55e; }
-.win-bar .win-title {
-  margin-left: auto; margin-right: auto;
-  font-size: 0.78rem; color: rgba(255,255,255,0.55);
-}
+.win-bar .win-title { margin-left: auto; margin-right: auto; font-size: 0.78rem; color: rgba(255,255,255,0.55); }
 .win-body { padding: 0.85rem; font-size: 0.82rem; color: #e2e8f0; }
 .cell { padding: 0.65rem 0.85rem; border-radius: 6px; margin-bottom: 0.55rem; }
-.cell.md {
-  background: rgba(167, 139, 250, 0.08);
-  border-left: 3px solid #a78bfa;
-  font-family: system-ui;
-  font-size: 0.85rem;
-}
+.cell.md { background: rgba(167, 139, 250, 0.08); border-left: 3px solid #a78bfa; font-family: system-ui; font-size: 0.85rem; }
 .cell.md .hl { color: #ddd6fe; font-weight: 600; }
 .cell.md .muted { color: rgba(255,255,255,0.55); margin-top: 0.2rem; font-size: 0.8rem; }
-.cell.code {
-  background: rgba(34, 197, 94, 0.06);
-  border-left: 3px solid #22c55e;
-  line-height: 1.55;
-  font-size: 0.79rem;
-}
+.cell.code { background: rgba(34, 197, 94, 0.06); border-left: 3px solid #22c55e; line-height: 1.55; font-size: 0.79rem; }
 .cell.code .kw { color: #c084fc; }
 .cell.code .fn { color: #fbbf24; }
 .cell.code .num { color: #5eead4; }
 .grade-strip {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  display: flex; align-items: center; gap: 0.35rem;
   padding: 0.55rem 0.6rem;
   background: rgba(255,255,255,0.04);
   border-radius: 6px;
-  font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
+  font-family: ui-monospace, monospace; font-size: 0.75rem;
 }
-.qchip {
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.7);
-}
+.qchip { padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
 .qchip.on { background: #2563eb; color: white; }
 .grade-score { margin-left: auto; color: #6ee7b7; font-weight: 600; }
 
-/* ---------- SECTIONS ---------- */
-.section-head {
-  max-width: 720px;
-  margin: 0 auto 2.5rem;
+/* trust strip below hero */
+.trust-strip {
+  max-width: 1100px;
+  margin: 3rem auto 0;
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  backdrop-filter: blur(4px);
+}
+.trust-strip > div {
   text-align: center;
+  display: flex; flex-direction: column; gap: 0.15rem;
 }
-.section-head h2 {
-  font-size: clamp(1.5rem, 3vw, 2.1rem);
-  letter-spacing: -0.01em;
-  color: var(--text-strong);
-  margin: 0 0 0.6rem;
+.trust-strip strong {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: white;
+  font-variant-numeric: tabular-nums;
 }
-.section-head p {
-  color: var(--text-muted);
-  font-size: 1rem;
-  margin: 0;
+.trust-strip span {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.65);
+  letter-spacing: 0.2px;
 }
 
-.features {
+/* ==================== Section heads ==================== */
+.section-head { max-width: 720px; margin: 0 auto 2.2rem; text-align: center; }
+.section-head h2 {
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+}
+.section-head p { color: var(--text-muted); font-size: 1rem; margin: 0; line-height: 1.5; }
+
+/* ==================== Workflow preview ==================== */
+.workflow {
   padding: 5rem 1.5rem;
   background: var(--bg-page);
+}
+.screens {
+  max-width: 1300px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+.screen {
+  position: relative;
+  display: flex; flex-direction: column;
+  transition: transform 0.2s, opacity 0.6s, transform 0.6s;
+}
+.screen:hover { transform: translateY(-4px); }
+.screen-tag {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  margin-bottom: 0.55rem;
+  align-self: flex-start;
+}
+.mock {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+  display: flex; flex-direction: column;
+}
+.mock-bar {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+}
+.mock-bar.navy {
+  background: var(--header-bg);
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+.mock-bar.navy .mock-title { color: rgba(255,255,255,0.85); }
+.mock-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+.mock-bar .dot.r { background: #ef4444; }
+.mock-bar .dot.y { background: #f59e0b; }
+.mock-bar .dot.g { background: #22c55e; }
+.mock-bar .mock-title { margin-left: auto; margin-right: auto; font-size: 0.78rem; color: var(--text-muted); }
+.mock-body { padding: 0.85rem; min-height: 280px; }
+
+/* Screen 1: Setup */
+.setup-mock { display: flex; flex-direction: column; gap: 0.4rem; }
+.setup-mock .step { font-size: 0.82rem; color: var(--text-muted); }
+.setup-mock .step.done { color: var(--success); }
+.setup-mock .step:last-child { color: var(--accent); border: 1px dashed var(--accent); padding: 0.4rem 0.6rem; border-radius: 6px; text-align: center; }
+.qrow {
+  display: grid;
+  grid-template-columns: 18px 60px 1fr 36px;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+.qrow.off { opacity: 0.4; }
+.qrow .check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px;
+  background: var(--bg-soft); color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  font-size: 0.7rem;
+}
+.qrow .check.on { background: var(--success); color: white; border-color: var(--success); }
+.qrow code { background: var(--accent-soft); color: #1e40af; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; }
+.qrow .bar {
+  height: 6px;
+  background: var(--bg-soft);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.qrow .bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #93c5fd);
+  border-radius: 3px;
+}
+.qrow .pts { font-size: 0.72rem; color: var(--text-muted); text-align: right; }
+
+/* Screen 2: Grading */
+.grading-mock { display: flex; flex-direction: column; gap: 0.55rem; }
+.g-top { font-size: 0.85rem; color: var(--text); }
+.g-top strong { color: var(--accent); margin-left: 0.3rem; }
+.g-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.g-chips .qchip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  background: var(--bg-soft);
+  color: var(--text);
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--border-strong);
+}
+.g-chips .qchip.done { border-color: var(--success); color: var(--success); }
+.g-chips .qchip.active { background: var(--accent); color: white; border-color: var(--accent); }
+.g-pane {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+}
+.g-col {
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border-left: 3px solid;
+}
+.g-col.solution { border-left-color: var(--accent); }
+.g-col.student { border-left-color: var(--success); }
+.g-col .lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 0.3rem; }
+.g-col .g-line { line-height: 1.4; }
+.g-col .kw { color: #8b5cf6; }
+.g-col .fn { color: #d97706; }
+.g-col .num { color: #0d9488; }
+.g-actions { display: flex; align-items: center; gap: 0.45rem; }
+.suggest-pill {
+  background: var(--warning-soft);
+  color: #92400e;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.btn-mini {
+  margin-left: auto;
+  background: var(--accent); color: white;
+  padding: 0.25rem 0.7rem; border-radius: 4px;
+  font-size: 0.75rem; font-weight: 600;
+}
+
+/* Screen 3: Plagiarism */
+.plag-mock { display: flex; flex-direction: column; gap: 0.7rem; }
+.plag-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.3rem; }
+.plag-stats .stat {
+  background: var(--bg-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.plag-stats .stat.warn { border-left-color: var(--warning); }
+.plag-stats .stat.danger { border-left-color: var(--danger); }
+.plag-stats .stat strong { font-size: 1rem; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.plag-stats .stat span { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.heatmap {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 0.4rem;
+  background: var(--bg-soft);
+  border-radius: 4px;
+}
+.hrow { display: flex; gap: 1px; }
+.hcell { width: 18px; height: 18px; border-radius: 1px; }
+.plag-pair {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-soft);
+  font-size: 0.78rem;
+}
+.plag-pair strong { color: var(--text-strong); }
+.plag-pair .plag-score { margin-left: auto; font-weight: 700; }
+.plag-pair .plag-score.danger { color: var(--danger); }
+
+/* ==================== Features ==================== */
+.features {
+  padding: 5rem 1.5rem;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 .features .grid {
   max-width: 1200px;
@@ -460,29 +881,13 @@ function go() {
   border-radius: 10px;
   margin-bottom: 0.85rem;
 }
-.features article h3 {
-  margin: 0 0 0.4rem;
-  font-size: 1.05rem;
-  color: var(--text-strong);
-}
-.features article p {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.92rem;
-  line-height: 1.55;
-}
+.features article h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--text-strong); }
+.features article p { margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.55; }
 
-/* How */
-.how {
-  padding: 5rem 1.5rem;
-  background: var(--bg-card);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
+/* ==================== How ==================== */
+.how { padding: 5rem 1.5rem; background: var(--bg-page); }
 .how .steps {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+  list-style: none; padding: 0;
   max-width: 1100px;
   margin: 0 auto;
   display: grid;
@@ -492,7 +897,7 @@ function go() {
 .how .steps li {
   position: relative;
   padding: 1.4rem;
-  background: var(--bg-page);
+  background: var(--bg-card);
   border-radius: 10px;
   border: 1px solid var(--border);
 }
@@ -506,27 +911,42 @@ function go() {
   font-weight: 700;
   margin-bottom: 0.7rem;
 }
-.how .steps h3 {
-  margin: 0 0 0.4rem;
-  font-size: 1.05rem;
-  color: var(--text-strong);
-}
-.how .steps p {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.92rem;
-  line-height: 1.55;
-}
+.how .steps h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--text-strong); }
+.how .steps p { margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.55; }
 .how .steps code {
-  background: var(--accent-soft);
-  color: #1e40af;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 0.85em;
-  border: 1px solid #bfdbfe;
+  background: var(--accent-soft); color: #1e40af;
+  padding: 1px 6px; border-radius: 3px;
+  font-size: 0.85em; border: 1px solid #bfdbfe;
 }
 
-/* Privacy block */
+/* ==================== Audience ==================== */
+.audience {
+  padding: 5rem 1.5rem;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.personas {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.personas article {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.6rem;
+  text-align: left;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.personas article:hover { border-color: var(--accent); transform: translateY(-2px); }
+.personas article .ico { font-size: 2rem; margin-bottom: 0.6rem; }
+.personas article h3 { margin: 0 0 0.45rem; color: var(--text-strong); font-size: 1.05rem; }
+.personas article p { margin: 0; color: var(--text); font-size: 0.9rem; line-height: 1.55; }
+
+/* ==================== Privacy card ==================== */
 .privacy { padding: 4rem 1.5rem; background: var(--bg-page); }
 .privacy-card {
   max-width: 900px;
@@ -547,29 +967,73 @@ function go() {
   border-radius: 14px;
   border: 1px solid #bfdbfe;
 }
-.privacy-card h3 {
-  margin: 0 0 0.5rem;
-  color: var(--text-strong);
-  font-size: 1.15rem;
+.privacy-card h3 { margin: 0 0 0.5rem; color: var(--text-strong); font-size: 1.15rem; }
+.privacy-card p { margin: 0 0 0.7rem; color: var(--text); font-size: 0.95rem; line-height: 1.6; }
+.privacy-card .micro { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0; }
+.privacy-card em { color: var(--accent); font-style: normal; font-weight: 600; }
+
+/* ==================== FAQ ==================== */
+.faq { padding: 5rem 1.5rem; background: var(--bg-card); border-top: 1px solid var(--border); }
+.faq-grid {
+  max-width: 900px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
 }
-.privacy-card p {
-  margin: 0 0 0.7rem;
-  color: var(--text);
-  font-size: 0.95rem;
-  line-height: 1.6;
+.faq details {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  transition: border-color 0.15s;
 }
-.privacy-card .micro {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 0;
-}
-.privacy-card em {
-  color: var(--accent);
-  font-style: normal;
+.faq details:hover { border-color: var(--border-strong); }
+.faq details[open] { border-color: var(--accent); }
+.faq summary {
+  cursor: pointer;
+  list-style: none;
   font-weight: 600;
+  color: var(--text-strong);
+  position: relative;
+  padding-right: 1.2rem;
+  font-size: 0.95rem;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: '+';
+  position: absolute;
+  right: 0; top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  font-weight: 400;
+  font-size: 1.3rem;
+  transition: transform 0.2s;
+}
+.faq details[open] summary::after { content: '–'; }
+.faq summary code {
+  background: var(--accent-soft);
+  color: #1e40af;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.faq details p {
+  margin: 0.7rem 0 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.faq details code {
+  background: var(--accent-soft);
+  color: #1e40af;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.86em;
 }
 
-/* Final CTA */
+/* ==================== Final CTA ==================== */
 .final-cta {
   padding: 5rem 1.5rem;
   text-align: center;
@@ -578,25 +1042,20 @@ function go() {
     var(--bg-page);
 }
 .final-cta h2 {
-  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-size: clamp(1.7rem, 3.5vw, 2.5rem);
   margin: 0 0 0.6rem;
   color: var(--text-strong);
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }
-.final-cta p {
-  color: var(--text-muted);
-  margin: 0 0 1.5rem;
-  font-size: 1.05rem;
-}
+.final-cta p { color: var(--text-muted); margin: 0 0 1.5rem; font-size: 1.05rem; }
 .final-cta .btn.big.btn-primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-  padding: 0.8rem 1.6rem;
-  font-size: 1.05rem;
+  background: var(--accent); color: white; border: none;
+  padding: 0.85rem 1.7rem; font-size: 1.05rem;
 }
 .final-cta .btn.big.btn-primary:hover { background: var(--accent-hover); }
 
-/* Footer */
+/* ==================== Footer ==================== */
 .foot {
   padding: 2rem 1.5rem 3rem;
   background: var(--header-bg);
@@ -608,14 +1067,22 @@ function go() {
 .foot a { color: #93c5fd; }
 .foot a:hover { color: white; }
 
-/* ---------- responsive ---------- */
-@media (max-width: 900px) {
+/* ==================== responsive ==================== */
+@media (max-width: 1024px) {
+  .screens { grid-template-columns: 1fr; max-width: 600px; }
+  .features .grid { grid-template-columns: repeat(2, 1fr); }
+  .how .steps { grid-template-columns: 1fr; }
+  .personas { grid-template-columns: 1fr; }
+  .faq-grid { grid-template-columns: 1fr; }
+  .trust-strip { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
   .hero { padding: 1rem 1.25rem 3rem; }
   .hero-inner { grid-template-columns: 1fr; gap: 2rem; }
   .hero-art { order: -1; }
   .window { transform: none; max-width: 380px; }
+  .window.float { animation: none; }
   .features .grid { grid-template-columns: 1fr; }
-  .how .steps { grid-template-columns: 1fr; }
   .privacy-card { grid-template-columns: 1fr; }
 }
 </style>
