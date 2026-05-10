@@ -1,12 +1,11 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// `base` matters for the GitHub Pages build (the site lives under
-// `/GradingToolJupyter2000/`). Local dev (`npm run dev`) keeps the root.
-export default defineConfig(({ command }) => ({
+// Hosted from the root on Cloudflare Pages (or any other static host).
+export default defineConfig({
   plugins: [vue()],
-  base: command === 'build' ? '/GradingToolJupyter2000/' : '/',
+  base: '/',
   build: {
     chunkSizeWarningLimit: 1500,
   },
-}))
+})
