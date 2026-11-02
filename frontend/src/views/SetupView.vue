@@ -135,6 +135,16 @@ async function onContinue() {
               </span>
               <span class="pill total">{{ totalMax }} points total</span>
             </div>
+            <p v-if="session.solution.detection === 'whole_file'" class="note">
+              No question markers found, so the whole file is graded as one question.
+              Check its points below. To split a file into several questions, start each one with a
+              comment such as <code># Q1 (2 points)</code> or a block like
+              <code>"""ID: 1 · Label: … · Grade: 2 points"""</code>.
+            </p>
+            <p v-else-if="!session.questions.length" class="error">
+              No questions found in this notebook. Start each question with a markdown cell such as
+              <code>## Q1 (2 points)</code> or <code>ID: 1 / Label: … / Grade: 2 points</code>.
+            </p>
             <div class="bulk-toggle">
               <button class="btn btn-link"
                       :disabled="allEnabled"
@@ -385,6 +395,16 @@ async function onContinue() {
 }
 
 .results { margin-top: 1rem; }
+.note {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning-tx);
+  font-size: 0.84rem;
+}
+.note code, .error code { font-size: 0.8rem; }
 .result-meta {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
   margin-bottom: 0.6rem;

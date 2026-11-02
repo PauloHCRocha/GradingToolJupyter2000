@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
+import { useAutogradeStore } from '../stores/autograde'
+import type { ReviewStatus } from '../stores/autograde'
 import { downloadGradesCsv, runCode, suggestGrade } from '../api/client'
 import type { CellOut, RunCodeResponse, SuggestResponse } from '../api/client'
+import { runnerWarmingUp } from '../runtime/runner'
 import NotebookViewer from '../components/NotebookViewer.vue'
 import CodeEditor from '../components/CodeEditor.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 
 const session = useSessionStore()
+const autograde = useAutogradeStore()
 const router = useRouter()
+const route = useRoute()
 
 const draft = reactive<Record<string, { points: number; comment: string }>>({})
 const saving = ref<Record<string, boolean>>({})
@@ -17,10 +22,42 @@ const suggesting = ref(false)
 const error = ref<string | null>(null)
 const toast = ref<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
-const runnerCode = ref('')
 const runnerStdin = ref('')
+const runnerTimeout = ref(10)
 const runnerResult = ref<RunCodeResponse | null>(null)
-const runnerLoading = ref(false)
+const solutionResult = ref<RunCodeResponse | null>(null)
+const runnerLoading = ref<'student' | 'solution' | null>(null)
+
+// The runner edits the teacher's working copy of the whole submission. It
+// starts as the original and is kept per student, so switching students or
+// questions never loses edits — and never changes the submission itself.
+const originalSource = computed(() => session.studentDetail?.source ?? '')
+const workingCopyEdited = computed(
+  () => !!session.selectedStudentId && session.selectedStudentId in session.workingCopies,
+)
+const workingCopy = computed({
+  get: () =>
+    workingCopyEdited.value ? session.workingCopies[session.selectedStudentId!] : originalSource.value,
+  set: (code: string) => {
+    const id = session.selectedStudentId
+    if (!id) return
+    if (code === originalSource.value) session.resetWorkingCopy(id)
+    else session.setWorkingCopy(id, code)
+  },
+})
+const solutionSource = computed(() => session.solutionDetail?.source ?? '')
+
+const sameOutput = computed(
+  () =>
+    !!runnerResult.value &&
+    !!solutionResult.value &&
+    runnerResult.value.success &&
+    solutionResult.value.success &&
+    runnerResult.value.output.trim() === solutionResult.value.output.trim(),
+)
+
+// "This question" shows each side's window; "Whole file" shows everything.
+const viewScope = ref<'question' | 'file'>('question')
 
 const lastSuggest = ref<SuggestResponse | null>(null)
 
@@ -81,42 +118,73 @@ const solutionCellsForQuestion = computed<CellOut[]>(() => {
   const sd = session.solutionDetail
   const qid = session.selectedQuestionId
   if (!sd) return []
-  if (!qid) return sd.cells
+  if (!qid || viewScope.value === 'file') return sd.cells
   const indices = sd.question_windows[qid] ?? []
   return indices.map((i) => sd.cells[i]).filter(Boolean)
+})
+
+// The student's file has no header for this question (renamed, deleted,
+// different template): show the whole file rather than an empty pane.
+const studentWindowMissing = computed(() => {
+  const sd = session.studentDetail
+  const qid = session.selectedQuestionId
+  return !!sd && !!qid && !(sd.question_windows[qid]?.length)
 })
 
 const studentCellsForQuestion = computed<CellOut[]>(() => {
   const sd = session.studentDetail
   const qid = session.selectedQuestionId
   if (!sd) return []
-  if (!qid) return sd.cells
+  if (!qid || viewScope.value === 'file' || studentWindowMissing.value) return sd.cells
   const indices = sd.question_windows[qid] ?? []
   return indices.map((i) => sd.cells[i]).filter(Boolean)
 })
 
-const studentCodeJoined = computed(() =>
-  studentCellsForQuestion.value
-    .filter((c) => c.cell_type === 'code')
-    .map((c) => c.source)
-    .join('\n\n'),
-)
-
-watch(
-  () => session.selectedQuestionId,
-  () => {
-    runnerCode.value = studentCodeJoined.value
-    runnerResult.value = null
-  },
-)
-
 watch(
   () => session.studentDetail?.info.id,
   () => {
-    runnerCode.value = studentCodeJoined.value
     runnerResult.value = null
   },
 )
+
+// --- Claude auto-grade review -------------------------------------------
+const aiStudent = computed(() =>
+  session.selectedStudentId ? (autograde.results[session.selectedStudentId] ?? null) : null,
+)
+const aiResult = computed(() => autograde.resultFor(session.selectedStudentId, session.selectedQuestionId))
+const aiStale = computed(() => !!aiStudent.value && aiStudent.value.rubricKey !== autograde.rubricKey)
+const reviewLabel: Record<ReviewStatus, string> = {
+  pending: 'not reviewed',
+  accepted: 'accepted',
+  overridden: 'changed by you',
+  rejected: 'rejected',
+}
+
+function applyAi() {
+  const qid = session.selectedQuestionId
+  if (!aiResult.value || !qid || !draft[qid]) return
+  draft[qid].points = aiResult.value.points
+  draft[qid].comment = aiResult.value.feedback
+}
+
+async function acceptAi() {
+  const sid = session.selectedStudentId
+  const qid = session.selectedQuestionId
+  if (!sid || !qid) return
+  try {
+    await autograde.accept(sid, qid)
+    syncDraft()
+    showToast('ok', `Accepted Claude's grade for ${qid}`)
+  } catch (e) {
+    showToast('err', e instanceof Error ? e.message : String(e))
+  }
+}
+
+function rejectAi() {
+  if (session.selectedStudentId && session.selectedQuestionId) {
+    autograde.reject(session.selectedStudentId, session.selectedQuestionId)
+  }
+}
 
 onMounted(async () => {
   if (!session.enabledQuestions.length || !session.students.length) {
@@ -127,7 +195,13 @@ onMounted(async () => {
   // to grading" case — store helper picks first enabled.
   session.ensureValidSelectedQuestion()
   await session.ensureSolutionDetail()
-  if (!session.selectedStudentId) {
+  // Deep link from the auto-grade review table: /grading?student=…&q=…
+  const wantQ = typeof route.query.q === 'string' ? route.query.q : null
+  const wantStudent = typeof route.query.student === 'string' ? route.query.student : null
+  if (wantQ && session.enabledQuestions.some((q) => q.id === wantQ)) session.selectQuestion(wantQ)
+  if (wantStudent && session.students.some((s) => s.id === wantStudent && !s.has_error)) {
+    await selectStudent(wantStudent)
+  } else if (!session.selectedStudentId) {
     const first = session.students.find((s) => !s.has_error)
     if (first) await selectStudent(first.id)
   } else {
@@ -199,7 +273,9 @@ async function save(qid: string) {
   saving.value[qid] = true
   error.value = null
   try {
-    await session.saveGrade(qid, Number(draft[qid].points) || 0, draft[qid].comment)
+    const points = Number(draft[qid].points) || 0
+    await session.saveGrade(qid, points, draft[qid].comment)
+    if (session.selectedStudentId) autograde.noteManualGrade(session.selectedStudentId, qid, points)
     showToast('ok', `Saved ${qid}`)
   } catch (e) {
     showToast('err', e instanceof Error ? e.message : String(e))
@@ -241,26 +317,27 @@ async function onSuggest() {
   }
 }
 
-async function onRun() {
-  runnerLoading.value = true
-  runnerResult.value = null
+async function run(which: 'student' | 'solution') {
+  runnerLoading.value = which
+  const target = which === 'student' ? runnerResult : solutionResult
+  target.value = null
+  const code = which === 'student' ? workingCopy.value : solutionSource.value
   try {
-    runnerResult.value = await runCode(runnerCode.value, runnerStdin.value)
+    target.value = await runCode(code, runnerStdin.value, runnerTimeout.value * 1000)
   } catch (e) {
-    runnerResult.value = {
+    target.value = {
       success: false,
       output: '',
       error: e instanceof Error ? e.message : String(e),
       duration_ms: 0,
     }
   } finally {
-    runnerLoading.value = false
+    runnerLoading.value = null
   }
 }
 
-function loadStudentCodeIntoRunner() {
-  runnerCode.value = studentCodeJoined.value
-  runnerResult.value = null
+function resetWorkingCopy() {
+  if (session.selectedStudentId) session.resetWorkingCopy(session.selectedStudentId)
 }
 
 function gradeFor(qid: string): number | null {
@@ -284,6 +361,9 @@ function gradeFor(qid: string): number | null {
       <div class="actions">
         <button class="btn" @click="router.push('/setup')">← Setup</button>
         <button class="btn btn-primary" @click="downloadGradesCsv">Export CSV</button>
+        <button class="btn btn-ai" @click="router.push('/autograde')">
+          Auto-grade<template v-if="autograde.pendingCount"> · {{ autograde.pendingCount }} to review</template>
+        </button>
         <button class="btn btn-warn" @click="router.push('/plagiarism')">Plagiarism</button>
         <ThemeToggle />
       </div>
@@ -427,7 +507,51 @@ function gradeFor(qid: string): number | null {
           </header>
           <pre class="suggest-comment">{{ lastSuggest.comment }}</pre>
         </div>
+
+        <div v-if="aiResult" class="ai-result">
+          <header>
+            <span class="ai-tag">Claude</span>
+            <strong>{{ aiResult.points }} / {{ aiResult.maxPoints }}</strong>
+            <span class="conf-pill" :class="aiResult.confidence">{{ aiResult.confidence }}</span>
+            <span class="review-pill" :class="aiResult.review">{{ reviewLabel[aiResult.review] }}</span>
+            <span v-if="aiStale" class="stale" title="The rubric was edited after this submission was graded">
+              rubric changed since
+            </span>
+            <span class="grow" />
+            <button class="btn btn-small" title="Copy points and feedback into the form above to edit them"
+                    @click="applyAi">Edit before saving</button>
+            <button class="btn btn-small" @click="rejectAi">Reject</button>
+            <button class="btn btn-small btn-primary" @click="acceptAi">Accept</button>
+          </header>
+          <ul class="ai-criteria">
+            <li v-for="c in aiResult.criteria" :key="c.id">
+              <span class="ai-pts" :class="{ full: c.points === c.max, zero: c.points === 0 }">
+                {{ c.points }}/{{ c.max }}
+              </span>
+              <div>
+                <div class="ai-desc">{{ c.description }}</div>
+                <div class="ai-why">{{ c.justification }}</div>
+              </div>
+            </li>
+          </ul>
+          <p v-if="aiResult.feedback" class="ai-feedback"><strong>Feedback:</strong> {{ aiResult.feedback }}</p>
+          <p v-if="aiStudent?.flags.length" class="ai-flags">⚠ {{ aiStudent.flags.join(' · ') }}</p>
+        </div>
+        <div v-else-if="aiStudent?.status === 'error'" class="ai-result ai-error">
+          Claude could not grade this submission: {{ aiStudent.error }}
+        </div>
       </section>
+
+      <div v-if="session.selectedStudentId" class="scope-row">
+        <div class="sort-toggle">
+          <span class="lbl">Show</span>
+          <button :class="{ active: viewScope === 'question' }" @click="viewScope = 'question'">This question</button>
+          <button :class="{ active: viewScope === 'file' }" @click="viewScope = 'file'">Whole file</button>
+        </div>
+        <span v-if="studentWindowMissing && viewScope === 'question'" class="scope-note">
+          No “{{ session.selectedQuestionId }}” header found in this submission — showing the student's whole file.
+        </span>
+      </div>
 
       <section
         v-if="session.selectedStudentId"
@@ -454,7 +578,7 @@ function gradeFor(qid: string): number | null {
         <article class="card pane right">
           <header class="card-head student">
             <h3><span class="side-dot" />Student submission</h3>
-            <button class="btn btn-small" @click="loadStudentCodeIntoRunner">Load to runner</button>
+            <span class="card-meta">original</span>
           </header>
           <div class="pane-body">
             <NotebookViewer :cells="studentCellsForQuestion"
@@ -465,34 +589,67 @@ function gradeFor(qid: string): number | null {
 
       <section v-if="session.selectedStudentId" class="card runner">
         <header class="card-head">
-          <h3>Run code</h3>
-          <span class="card-meta muted">Runs as a Python subprocess (10s timeout)</span>
+          <h3>
+            Run code · your working copy
+            <span v-if="workingCopyEdited" class="edited-pill">edited</span>
+          </h3>
+          <span class="card-meta muted">
+            Edits stay here and never change the submission. Runs in a separate in-browser Python.
+          </span>
         </header>
         <div class="runner-editor">
           <CodeEditor
-            v-model="runnerCode"
-            :rows="12"
-            placeholder="Paste or load the student's code here..."
+            v-model="workingCopy"
+            :rows="14"
+            placeholder="The student's code appears here."
           />
         </div>
         <div class="run-row">
-          <input class="stdin" v-model="runnerStdin" placeholder="Optional stdin" />
-          <button class="btn btn-primary" :disabled="runnerLoading" @click="onRun">
-            <span v-if="runnerLoading" class="spin" />
-            {{ runnerLoading ? 'Running…' : 'Run' }}
+          <textarea class="stdin" v-model="runnerStdin" rows="2"
+                    placeholder="Input for input() — one line per call (optional)" />
+          <label class="timeout">
+            Stop after
+            <select v-model.number="runnerTimeout">
+              <option :value="5">5 s</option>
+              <option :value="10">10 s</option>
+              <option :value="30">30 s</option>
+              <option :value="60">60 s</option>
+            </select>
+          </label>
+          <button class="btn" :disabled="!workingCopyEdited" @click="resetWorkingCopy">Reset to original</button>
+          <button class="btn" :disabled="!!runnerLoading || !solutionSource" @click="run('solution')">
+            <span v-if="runnerLoading === 'solution'" class="spin" />
+            Run solution
           </button>
-          <span v-if="runnerResult" class="run-meta" :class="runnerResult.success ? 'ok' : 'err'">
-            {{ runnerResult.success ? '✓' : '✗' }} {{ runnerResult.duration_ms }}ms
-          </span>
+          <button class="btn btn-primary" :disabled="!!runnerLoading" @click="run('student')">
+            <span v-if="runnerLoading === 'student'" class="spin" />
+            {{ runnerLoading === 'student' ? 'Running…' : 'Run student code' }}
+          </button>
         </div>
-        <div v-if="runnerResult" class="run-out">
-          <div v-if="runnerResult.output">
-            <span class="lbl">Output</span>
-            <pre>{{ runnerResult.output }}</pre>
-          </div>
-          <div v-if="runnerResult.error">
-            <span class="lbl err">Error</span>
-            <pre class="err">{{ runnerResult.error }}</pre>
+        <p v-if="runnerLoading && runnerWarmingUp" class="runner-hint">
+          Starting the code runner (first run only, a few seconds)…
+        </p>
+        <div v-if="runnerResult || solutionResult" class="run-out">
+          <p v-if="runnerResult && solutionResult" class="compare" :class="sameOutput ? 'ok' : 'diff'">
+            {{ sameOutput ? '✓ Same output as the solution' : '≠ Output differs from the solution' }}
+          </p>
+          <div class="run-cols">
+            <div v-if="solutionResult" class="run-col">
+              <span class="lbl">
+                Solution · {{ solutionResult.success ? '✓' : '✗' }} {{ solutionResult.duration_ms }}ms
+              </span>
+              <pre v-if="solutionResult.output">{{ solutionResult.output }}</pre>
+              <pre v-if="solutionResult.error" class="err">{{ solutionResult.error }}</pre>
+              <pre v-if="!solutionResult.output && !solutionResult.error" class="empty">(no output)</pre>
+            </div>
+            <div v-if="runnerResult" class="run-col">
+              <span class="lbl" :class="runnerResult.success ? 'ok' : 'err'">
+                Student · {{ runnerResult.success ? '✓' : '✗' }} {{ runnerResult.duration_ms }}ms
+              </span>
+              <pre v-if="runnerResult.output">{{ runnerResult.output }}</pre>
+              <pre v-if="runnerResult.error" class="err">{{ runnerResult.error }}</pre>
+              <pre v-if="!runnerResult.output && !runnerResult.error" class="empty">(no output)</pre>
+            </div>
           </div>
         </div>
       </section>
@@ -550,6 +707,8 @@ function gradeFor(qid: string): number | null {
 .appbar .btn-primary { background: var(--accent); border-color: var(--accent); }
 .appbar .btn-warn { background: var(--warning); border-color: var(--warning); color: white; }
 .appbar .btn-warn:hover:not(:disabled) { background: #b45309; border-color: #b45309; }
+.appbar .btn-ai { background: var(--ai); border-color: var(--ai); color: white; }
+.appbar .btn-ai:hover:not(:disabled) { background: var(--ai-hover); border-color: var(--ai-hover); }
 
 /* ---- Top nav ---- */
 .topnav {
@@ -779,7 +938,8 @@ function gradeFor(qid: string): number | null {
   background: var(--bg-soft);
 }
 .suggest-result header { display: flex; align-items: center; gap: 0.55rem; font-size: 0.92rem; }
-.suggest-result .conf-pill {
+.suggest-result .conf-pill,
+.ai-result .conf-pill {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
@@ -803,6 +963,46 @@ function gradeFor(qid: string): number | null {
   white-space: pre-wrap;
   font-family: inherit;
 }
+
+/* Claude result */
+.ai-result {
+  padding: 0.7rem 0.9rem;
+  border-top: 1px solid var(--border);
+  background: var(--ai-soft);
+}
+.ai-result header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.92rem; }
+.ai-result .grow { flex: 1; }
+.ai-tag {
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--ai); color: white;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;
+}
+.review-pill {
+  padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600;
+  background: var(--border); color: var(--text-muted);
+}
+.review-pill.accepted { background: var(--success-soft); color: var(--success-tx); }
+.review-pill.overridden { background: var(--accent-soft); color: var(--accent-tx); }
+.review-pill.rejected { background: var(--danger-soft); color: var(--danger-tx); }
+.stale { font-size: 0.75rem; color: var(--warning-tx); }
+.ai-criteria { list-style: none; margin: 0.55rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.ai-criteria li {
+  display: grid; grid-template-columns: 4.2rem 1fr; gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.83rem;
+}
+.ai-pts { font-family: ui-monospace, monospace; font-weight: 700; color: var(--warning-tx); }
+.ai-pts.full { color: var(--success); }
+.ai-pts.zero { color: var(--danger); }
+.ai-desc { color: var(--text-strong); font-weight: 500; }
+.ai-why { color: var(--text-muted); margin-top: 0.15rem; }
+.ai-feedback { margin: 0.55rem 0 0; font-size: 0.85rem; }
+.ai-flags { margin: 0.4rem 0 0; font-size: 0.82rem; color: var(--danger-tx); }
+.ai-error { color: var(--danger-tx); font-size: 0.85rem; }
+
+.scope-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: -0.35rem; }
+.scope-note { font-size: 0.8rem; color: var(--warning-tx); }
 
 /* code panes */
 .pane { padding: 0; }
@@ -834,20 +1034,40 @@ function gradeFor(qid: string): number | null {
   display: flex; gap: 0.5rem; align-items: center;
   padding: 0 0.8rem 0.7rem;
 }
+.run-row { flex-wrap: wrap; }
 .run-row .stdin {
-  flex: 1; padding: 0.4rem 0.55rem;
+  flex: 1; min-width: 220px; padding: 0.4rem 0.55rem;
   font-size: 0.85rem;
+  font-family: ui-monospace, monospace;
+  resize: vertical;
 }
-.run-meta { font-size: 0.85rem; }
-.run-meta.ok { color: var(--success); }
-.run-meta.err { color: var(--danger); }
+.run-row .timeout { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; }
+.run-row .timeout select { padding: 0.3rem 0.4rem; font-size: 0.82rem; }
+.runner-hint { margin: 0 0.8rem 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
+.edited-pill {
+  margin-left: 0.4rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: var(--warning-soft);
+  color: var(--warning-tx);
+  border: 1px solid var(--warning-bd);
+}
 .run-out { padding: 0 0.8rem 0.85rem; }
+.run-out .compare { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; }
+.run-out .compare.ok { color: var(--success); }
+.run-out .compare.diff { color: var(--warning); }
+.run-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.6rem; }
+.run-col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .run-out .lbl {
   display: inline-block;
   font-size: 0.7rem; text-transform: uppercase;
   color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 0.2rem;
 }
+.run-out .lbl.ok { color: var(--success); }
 .run-out .lbl.err { color: var(--danger); }
+.run-out pre.empty { color: var(--text-muted); font-style: italic; }
 .run-out pre {
   margin: 0; padding: 0.55rem 0.7rem;
   background: var(--code-bg);

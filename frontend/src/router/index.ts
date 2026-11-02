@@ -14,5 +14,6 @@ export const router = createRouter({
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/grading', name: 'grading', component: GradingView },
     { path: '/plagiarism', name: 'plagiarism', component: PlagiarismView },
+    { path: '/autograde', name: 'autograde', component: () => import('../views/AutoGradeView.vue') },
   ],
 })

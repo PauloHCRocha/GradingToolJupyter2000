@@ -31,6 +31,10 @@ export const useSessionStore = defineStore('session', () => {
   const selectedQuestionId = ref<string | null>(null)
   const studentDetail = ref<StudentDetail | null>(null)
   const studentGrades = ref<Record<string, GradeOut>>({})
+  // The teacher's edited copy of each submission, keyed by student id. The
+  // original (studentDetail.source) is never touched; grading, plagiarism
+  // and auto-grading always read the original.
+  const workingCopies = ref<Record<string, string>>({})
 
   const ready = computed(() => questions.value.length > 0 && students.value.length > 0)
 
@@ -99,6 +103,15 @@ export const useSessionStore = defineStore('session', () => {
     selectedStudentId.value = null
     studentDetail.value = null
     studentGrades.value = {}
+    workingCopies.value = {}
+  }
+
+  function setWorkingCopy(studentId: string, code: string) {
+    workingCopies.value[studentId] = code
+  }
+
+  function resetWorkingCopy(studentId: string) {
+    delete workingCopies.value[studentId]
   }
 
   async function refreshStudents() {
@@ -164,12 +177,15 @@ export const useSessionStore = defineStore('session', () => {
 
   async function saveGrade(questionId: string, points: number, comment: string) {
     if (!selectedStudentId.value) return
-    const result = await setStudentGrade(selectedStudentId.value, questionId, {
-      points,
-      comment,
-    })
-    studentGrades.value = Object.fromEntries(result.entries.map((e) => [e.question_id, e]))
-    patchStudentTotal(selectedStudentId.value, result.total)
+    await saveGradeFor(selectedStudentId.value, questionId, points, comment)
+  }
+
+  async function saveGradeFor(studentId: string, questionId: string, points: number, comment: string) {
+    const result = await setStudentGrade(studentId, questionId, { points, comment })
+    if (studentId === selectedStudentId.value) {
+      studentGrades.value = Object.fromEntries(result.entries.map((e) => [e.question_id, e]))
+    }
+    patchStudentTotal(studentId, result.total)
   }
 
   return {
@@ -183,6 +199,7 @@ export const useSessionStore = defineStore('session', () => {
     selectedQuestionId,
     studentDetail,
     studentGrades,
+    workingCopies,
     ready,
     enabledQuestions,
     currentStudent,
@@ -193,6 +210,8 @@ export const useSessionStore = defineStore('session', () => {
     setAllQuestionsEnabled,
     commitQuestions,
     setStudents,
+    setWorkingCopy,
+    resetWorkingCopy,
     refreshStudents,
     setSortOrder,
     ensureSolutionDetail,
@@ -201,5 +220,6 @@ export const useSessionStore = defineStore('session', () => {
     selectQuestion,
     navigate,
     saveGrade,
+    saveGradeFor,
   }
 })

@@ -289,7 +289,7 @@ onBeforeUnmount(() => {
         <article>
           <div class="ico"><LandingIcon name="privacy" /></div>
           <h3>Privacy by design</h3>
-          <p>There's no backend. Student files are read in the browser and stay there. Closing the tab clears everything.</p>
+          <p>There's no backend. Student files are read in the browser and stay there. Closing the tab clears everything. Opt-in auto-grading only ever sends anonymized code.</p>
         </article>
         <article>
           <div class="ico"><LandingIcon name="detect" /></div>
@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
         <article>
           <div class="ico"><LandingIcon name="play" /></div>
           <h3>Run student code safely</h3>
-          <p>Execute submissions inside the browser sandbox. No subprocess on a server, no risk to your machine.</p>
+          <p>Execute submissions in a separate in-browser Python with a time limit, next to your solution's output. Edit a working copy freely — the submission never changes.</p>
         </article>
         <article>
           <div class="ico"><LandingIcon name="split" /></div>
@@ -378,9 +378,12 @@ onBeforeUnmount(() => {
           <summary>Is my students' data really private?</summary>
           <p>
             Yes. The page is static; the only network requests it makes are to load
-            Pyodide (the Python runtime) from a CDN once, and to load this page itself
-            from this site. Nothing about your files is ever sent anywhere. You can
-            verify this in your browser's Network tab.
+            Pyodide (the Python runtime) and its packages from a CDN, and to load this
+            page itself from this site. Nothing about your files is sent anywhere —
+            unless you turn on Claude auto-grading with your own API key. Then only
+            anonymized code goes to the Claude API: names, student numbers, e-mails and
+            filenames are removed first, and you can preview exactly what is sent. You
+            can verify all of this in your browser's Network tab.
           </p>
         </details>
         <details>
@@ -412,8 +415,24 @@ onBeforeUnmount(() => {
         <details>
           <summary>Does it work for plain <code>.py</code> files?</summary>
           <p>
-            Yes. The same flow handles <code>.py</code> sources — the question
-            detector reads docstrings and comments instead of markdown cells.
+            Yes. A comment such as <code># Q1 (2 points)</code> or
+            <code># Question 2</code> at the start of a line (or a docstring
+            starting with one) begins a new question, and so does a block like
+            <code>"""ID: 1 / Label: … / Grade: 5 points"""</code> (Portuguese keys
+            such as <code>Pergunta</code>, <code>Enunciado</code> and
+            <code>Cotação</code> work too). <code># %%</code> cell markers are
+            honoured. A file with no markers at all is graded as a single question.
+            If a student renamed or removed a header, their whole file is shown.
+          </p>
+        </details>
+        <details>
+          <summary>Can Claude grade the submissions for me?</summary>
+          <p>
+            It can propose grades — you decide. Claude first drafts a solution and a
+            rubric for each question; you edit both. It then grades each anonymized
+            submission against your rubric, criterion by criterion, and every proposed
+            grade waits for you to accept, change or reject it next to the student's
+            code. Only accepted grades reach the CSV.
           </p>
         </details>
         <details>

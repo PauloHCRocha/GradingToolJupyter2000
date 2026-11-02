@@ -25,15 +25,9 @@ def compute_windows(cells: list[Cell], questions: list[dict]) -> dict[str, list[
     return windows
 
 
-def detect_in_cells(cells: list[Cell]) -> list[dict]:
-    from question_detector import _scan_text_block, _merge_hits
+def detect_in_cells(cells: list[Cell], file_type: str = "ipynb") -> list[dict]:
+    from question_detector import detect_in_cells as _detect
 
-    hits = []
-    for idx, cell in enumerate(cells):
-        if cell.cell_type != "markdown":
-            continue
-        hits.extend(_scan_text_block(cell.source, idx))
-    merged = _merge_hits(hits)
     return [
         {
             "id": h.qid,
@@ -42,5 +36,5 @@ def detect_in_cells(cells: list[Cell]) -> list[dict]:
             "statement": h.statement,
             "cell_indices": h.cell_indices,
         }
-        for h in merged
+        for h in _detect(cells, file_type)
     ]

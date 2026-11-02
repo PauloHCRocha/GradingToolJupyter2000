@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import ast
-import json
 import re
 from dataclasses import dataclass, field
+
+from notebook_parser import _DECORATION, QUESTION_HEADER, Cell, parse_metadata, parse_notebook, parse_python
 
 SUB_QUESTION_PATTERN = re.compile(r"\bQ\s*(\d+)\s*[-.]\s*(\d+)\b", re.IGNORECASE)
 TOP_QUESTION_PATTERN = re.compile(r"\b(?:Question|Q)\s*(\d+)\b(?!\s*[-.]\s*\d)", re.IGNORECASE)
@@ -19,14 +19,6 @@ class Hit:
     statement: str
     points: float | None = None
     cell_indices: list[int] = field(default_factory=list)
-
-
-def _to_str(content):
-    if hasattr(content, "to_py") and not isinstance(content, (bytes, bytearray, memoryview, str)):
-        content = content.to_py()
-    if isinstance(content, str):
-        return content
-    return bytes(content).decode("utf-8", errors="replace")
 
 
 def _extract_points(text: str):
@@ -83,40 +75,124 @@ def _merge_hits(hits: list[Hit]) -> list[Hit]:
 
 
 def detect_in_notebook(content) -> list[Hit]:
-    notebook = json.loads(_to_str(content))
+    return detect_in_cells(parse_notebook(content), "ipynb")
+
+
+def _code_header(source: str) -> str:
+    """Leading comment block (and a docstring right after it) of a .py cell,
+    with the comment markers stripped."""
+    out: list[str] = []
+    lines = source.splitlines()
+    i = 0
+    while i < len(lines) and (not lines[i].strip() or lines[i].lstrip().startswith("#")):
+        if not _DECORATION.match(lines[i].strip()):  # skip "# =====" rulers
+            out.append(lines[i].lstrip().lstrip("#").strip())
+        i += 1
+    if i < len(lines):
+        m = re.match(r"\s*[rRuU]?(\"\"\"|\'\'\')", lines[i])
+        if m:
+            quote = m.group(1)
+            rest = lines[i][m.end():]
+            while True:
+                if quote in rest:
+                    out.append(rest.split(quote, 1)[0])
+                    break
+                out.append(rest)
+                i += 1
+                if i >= len(lines):
+                    break
+                rest = lines[i]
+    return "\n".join(out).strip()
+
+
+_ID_VALUE = re.compile(r"^\D{0,12}?(\d+)(?:\s*[.\-]\s*(\d+))?")
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _metadata_hit(meta: dict, idx: int) -> Hit:
+    """Hit from an "ID: / Label: / Grade:" block. The qid is left empty when
+    the ID isn't numeric; detect_in_cells numbers those in order."""
+    qid = label = ""
+    m = _ID_VALUE.match(meta.get("id", ""))
+    if m and m.group(2):
+        qid = label = f"Q{int(m.group(1))}-{int(m.group(2))}"
+    elif m:
+        qid, label = f"Q{int(m.group(1))}", f"Question {int(m.group(1))}"
+    pts = _NUMBER.search(meta.get("points", ""))
+    return Hit(
+        qid=qid,
+        label=label,
+        statement=meta.get("label") or meta.get("id", ""),
+        points=float(pts.group().replace(",", ".")) if pts else None,
+        cell_indices=[idx],
+    )
+
+
+def whole_file_hit(cells: list[Cell]) -> Hit:
+    """A .py file with no question markers at all is one question: its
+    opening comment/docstring (if any) is the statement."""
+    header = _code_header(cells[0].source) if cells else ""
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:points?|pts?|pontos?|valores?)\b", header, re.IGNORECASE)
+    return Hit(
+        qid="Q1",
+        label="Question 1",
+        statement=header or "Whole file (no question markers found)",
+        points=float(m.group(1).replace(",", ".")) if m else None,
+        cell_indices=[0],
+    )
+
+
+def detect_in_cells(cells: list[Cell], file_type: str = "ipynb") -> list[Hit]:
+    """Notebooks: scan markdown cells. Python files: also scan the header of
+    each code cell — but only cells that *open* with a question header, and
+    only that header's first marker, so "# Q2: reuse the function from Q1"
+    belongs to Q2 alone. Key/value blocks ("ID: 1 / Label: … / Grade: 5
+    points") are understood in both."""
     hits: list[Hit] = []
-    for idx, cell in enumerate(notebook.get("cells", [])):
-        if cell.get("cell_type") != "markdown":
+    for idx, cell in enumerate(cells):
+        if cell.cell_type == "markdown":
+            found = _scan_text_block(cell.source, idx)
+            if not found:
+                meta = parse_metadata(cell.source)
+                found = [_metadata_hit(meta, idx)] if meta else []
+            hits.extend(found)
             continue
-        source = cell.get("source", "")
-        text = source if isinstance(source, str) else "".join(source)
-        hits.extend(_scan_text_block(text, idx))
+        if file_type != "py":
+            continue
+        meta = parse_metadata(_code_header(cell.source))
+        if meta:
+            hits.append(_metadata_hit(meta, idx))
+            continue
+        first = next((l for l in cell.source.splitlines() if l.strip() and not _DECORATION.match(l)), "")
+        if not QUESTION_HEADER.match(first):
+            continue
+        header = _code_header(cell.source)
+        found = _scan_text_block(header, idx)
+        if found:
+            h = found[0]
+            hits.append(Hit(
+                qid=h.qid,
+                label=h.label,
+                statement=header,
+                points=_extract_points(header),
+                cell_indices=[idx],
+            ))
+
+    # Non-numeric IDs ("ID: A", "ID: soma") get the next free numbers, in order.
+    used = {int(h.qid[1:].split("-")[0]) for h in hits if h.qid}
+    n = 0
+    for h in hits:
+        if not h.qid:
+            n += 1
+            while n in used:
+                n += 1
+            used.add(n)
+            h.qid, h.label = f"Q{n}", f"Question {n}"
     return _merge_hits(hits)
 
 
 def detect_in_python(content) -> list[Hit]:
-    source = _to_str(content)
-    hits: list[Hit] = []
-
-    for line_no, line in enumerate(source.splitlines()):
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            hits.extend(_scan_text_block(stripped.lstrip("#").strip(), line_no))
-
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        tree = None
-
-    if tree is not None:
-        for node in ast.walk(tree):
-            doc = ast.get_docstring(node) if isinstance(
-                node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-            ) else None
-            if doc:
-                hits.extend(_scan_text_block(doc, getattr(node, "lineno", 0) or 0))
-
-    return _merge_hits(hits)
+    return detect_in_cells(parse_python(content), "py")
 
 
 def detect(filename: str, content) -> tuple[str, list[Hit]]:

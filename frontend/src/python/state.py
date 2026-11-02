@@ -23,6 +23,7 @@ class _SessionState:
     solution_filename: str | None = None
     solution_file_type: str | None = None
     solution_cells: list = field(default_factory=list)
+    solution_source: str = ""
     solution_question_windows: dict = field(default_factory=dict)
     plagiarism_matrix: list | None = None
     plagiarism_student_ids: list = field(default_factory=list)
@@ -45,13 +46,15 @@ def reset_all():
     _state.solution_filename = None
     _state.solution_file_type = None
     _state.solution_cells.clear()
+    _state.solution_source = ""
     _state.solution_question_windows.clear()
 
 
-def set_solution(filename, file_type, cells, questions, windows):
+def set_solution(filename, file_type, cells, questions, windows, source=""):
     _state.solution_filename = filename
     _state.solution_file_type = file_type
     _state.solution_cells = list(cells)
+    _state.solution_source = source
     _state.questions = list(questions)
     _state.solution_question_windows = dict(windows)
 
@@ -63,6 +66,10 @@ def get_solution():
         _state.solution_filename,
         _state.solution_file_type,
     )
+
+
+def get_solution_source():
+    return _state.solution_source
 
 
 def set_questions(questions):
