@@ -1,21 +1,30 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
-import { analyzeSolution, uploadSubmissions } from '../api/client'
+import { analyzeSolution, uploadSubmissionFiles, uploadSubmissions } from '../api/client'
+import type { SubmissionsUploadResult } from '../api/client'
 import { useSessionStore } from '../stores/session'
-import ThemeToggle from '../components/ThemeToggle.vue'
 import PointsInput from '../components/PointsInput.vue'
+import FileDrop from '../components/FileDrop.vue'
+import AppHeader from '../components/AppHeader.vue'
 
 const session = useSessionStore()
 const router = useRouter()
 
-const solutionFile = ref<File | null>(null)
-const submissionsFile = ref<File | null>(null)
-const loadingSolution = ref(false)
-const loadingSubmissions = ref(false)
+const loadingSolution = ref<string | null>(null)
+const loadingSubmissions = ref<string | null>(null)
+const submissionsName = ref<string | null>(null)
+// Students dropped before the solution: loaded as soon as the solution is in.
+interface StudentsJob {
+  label: string
+  load: () => Promise<SubmissionsUploadResult>
+}
+const pendingStudents = shallowRef<StudentsJob | null>(null)
 const continuing = ref(false)
 const errorSolution = ref<string | null>(null)
 const errorSubmissions = ref<string | null>(null)
+// Page-level hint when a drop was ambiguous.
+const notice = ref<string | null>(null)
 
 // Totals reflect what will *actually* be graded (enabled questions only) so
 // the "X points total" pill matches what students see at grading time.
@@ -30,47 +39,192 @@ const noneEnabled = computed(
   () => session.questions.length > 0 && session.questions.every((q) => !q.enabled),
 )
 
+// Nothing is still being read: going to grading mid-way would show stale
+// or missing code.
+const busy = computed(() => !!loadingSolution.value || !!loadingSubmissions.value || !!pendingStudents.value)
 const canContinue = computed(
-  () => session.enabledQuestions.length > 0 && session.students.length > 0,
+  () => !busy.value && session.enabledQuestions.length > 0 && session.students.length > 0,
 )
+const hasGrades = () => session.students.some((s) => s.total_grade > 0)
 
-function pickSolution(e: Event) {
-  solutionFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
-  errorSolution.value = null
+// --- what each drop zone shows ---------------------------------------------
+const solutionZone = computed(() => {
+  if (loadingSolution.value) return { status: 'busy' as const, title: `Analyzing ${loadingSolution.value}…`, detail: 'Detecting questions and points' }
+  if (errorSolution.value) return { status: 'error' as const, title: "Couldn't use that file", detail: errorSolution.value, removeLabel: 'Dismiss' }
+  if (session.solution) {
+    const n = session.questions.length
+    return {
+      status: 'done' as const,
+      title: session.solution.filename,
+      detail: `${n} question${n === 1 ? '' : 's'} · ${totalMax.value} points — drop another file to replace it`,
+      removeLabel: 'Remove',
+    }
+  }
+  return { status: 'idle' as const, title: 'Drop the solution file here', detail: '.py or .ipynb — or click to choose' }
+})
+
+const submissionsZone = computed(() => {
+  if (loadingSubmissions.value) return { status: 'busy' as const, title: `Reading ${loadingSubmissions.value}…`, detail: 'Matching each submission to the questions' }
+  if (pendingStudents.value) return { status: 'pending' as const, title: pendingStudents.value.label, detail: 'Waiting for the solution file — loads as soon as the solution is in', removeLabel: 'Cancel' }
+  if (errorSubmissions.value) return { status: 'error' as const, title: "Couldn't use that file", detail: errorSubmissions.value, removeLabel: 'Dismiss' }
+  if (session.students.length) {
+    const n = session.students.length
+    return {
+      status: 'done' as const,
+      title: submissionsName.value ?? 'Submissions',
+      detail: `${n} student${n === 1 ? '' : 's'} loaded — drop again to replace them`,
+      removeLabel: 'Remove',
+    }
+  }
+  return {
+    status: 'idle' as const,
+    title: "Drop the students' files here",
+    detail: 'A .zip (e.g. from Moodle), or the .py / .ipynb files themselves — or click to choose',
+  }
+})
+
+// --- handling files --------------------------------------------------------
+const isZip = (f: File) => /\.zip$/i.test(f.name)
+const isCode = (f: File) => /\.(py|ipynb)$/i.test(f.name)
+const fromZip = (f: File): StudentsJob => ({ label: f.name, load: () => uploadSubmissions(f) })
+const fromFiles = (fs: File[]): StudentsJob => ({
+  label: fs.length === 1 ? fs[0].name : `${fs.length} student files`,
+  load: () => uploadSubmissionFiles(fs),
+})
+
+/** Box 1 takes the solution, box 2 the students' work (a zip or loose
+ *  files). Dropped elsewhere on the page, a .zip is the students and a
+ *  single .py/.ipynb the solution — so both can go in one drop. */
+async function handleFiles(files: File[], zone?: 'solution' | 'students') {
+  dragging.value = false
+  dragDepth = 0
+  notice.value = null
+  const zips = files.filter(isZip)
+  const code = files.filter(isCode)
+  if (!zips.length && !code.length) {
+    const msg = `“${files[0].name}” isn't a .py, .ipynb or .zip file.`
+    if (zone === 'students') errorSubmissions.value = msg
+    else errorSolution.value = msg
+    return
+  }
+
+  let solution: File | undefined
+  let students: StudentsJob | null = zips.length ? fromZip(zips[0]) : null
+  if (zone === 'students') {
+    students ??= fromFiles(code)
+  } else if (zone === 'solution' || code.length === 1) {
+    solution = code[0]
+    if (code.length > 1) notice.value = `Only one solution file is used (${code[0].name}). Drop the students' files on box 2.`
+  } else if (code.length > 1) {
+    notice.value = "Several .py / .ipynb files: drop the solution on box 1 and the students' files on box 2."
+  }
+
+  if (students) {
+    if (hasGrades() && !window.confirm('Replacing the submissions clears the grades given so far. Continue?')) {
+      students = null
+    } else {
+      errorSubmissions.value = null
+      pendingStudents.value = students
+    }
+  }
+  if (solution) await loadSolution(solution)
+  else if (session.solution) await loadPendingStudents()
 }
 
-function pickSubmissions(e: Event) {
-  submissionsFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
-  errorSubmissions.value = null
-}
-
-async function onAnalyze() {
-  if (!solutionFile.value) return
-  loadingSolution.value = true
+async function loadSolution(file: File) {
+  loadingSolution.value = file.name
   errorSolution.value = null
   try {
-    const analysis = await analyzeSolution(solutionFile.value)
-    session.setSolution(analysis)
+    session.setSolution(await analyzeSolution(file))
+    // Students already loaded and no new ones on the way: match them to the
+    // new questions (their grades stay).
+    if (session.students.length && !pendingStudents.value) await session.rematchStudents()
   } catch (e) {
     errorSolution.value = e instanceof Error ? e.message : String(e)
   } finally {
-    loadingSolution.value = false
+    loadingSolution.value = null
   }
+  if (session.solution) await loadPendingStudents()
 }
 
-async function onUploadSubmissions() {
-  if (!submissionsFile.value) return
-  loadingSubmissions.value = true
+async function loadPendingStudents() {
+  const job = pendingStudents.value
+  if (!job) return
+  pendingStudents.value = null
+  loadingSubmissions.value = job.label
   errorSubmissions.value = null
   try {
-    const result = await uploadSubmissions(submissionsFile.value)
+    const result = await job.load()
     session.setStudents(result.students, result.warnings)
+    submissionsName.value = job.label
   } catch (e) {
     errorSubmissions.value = e instanceof Error ? e.message : String(e)
   } finally {
-    loadingSubmissions.value = false
+    loadingSubmissions.value = null
   }
 }
+
+// --- removing ----------------------------------------------------------------
+async function removeSolution() {
+  if (errorSolution.value) {
+    errorSolution.value = null
+    return
+  }
+  await session.clearSolution()
+}
+
+async function removeStudents() {
+  if (pendingStudents.value) {
+    pendingStudents.value = null
+    return
+  }
+  if (errorSubmissions.value) {
+    errorSubmissions.value = null
+    return
+  }
+  if (hasGrades() && !window.confirm('Removing the submissions also removes the grades given so far. Continue?')) return
+  await session.clearStudents()
+  submissionsName.value = null
+}
+
+// --- page-wide drag & drop ---------------------------------------------------
+// A file dropped outside the zones would otherwise make the browser open it
+// and leave the app; here it is loaded instead.
+const dragging = ref(false)
+let dragDepth = 0
+const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+
+function onWindowDragEnter(e: DragEvent) {
+  if (!isFileDrag(e)) return
+  dragDepth++
+  dragging.value = true
+}
+function onWindowDragLeave(e: DragEvent) {
+  if (!isFileDrag(e)) return
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (!dragDepth) dragging.value = false
+}
+function onWindowDragOver(e: DragEvent) {
+  if (isFileDrag(e)) e.preventDefault()
+}
+function onWindowDrop(e: DragEvent) {
+  if (!isFileDrag(e)) return
+  e.preventDefault()
+  void handleFiles(Array.from(e.dataTransfer?.files ?? []))
+}
+
+onMounted(() => {
+  window.addEventListener('dragenter', onWindowDragEnter)
+  window.addEventListener('dragleave', onWindowDragLeave)
+  window.addEventListener('dragover', onWindowDragOver)
+  window.addEventListener('drop', onWindowDrop)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('dragenter', onWindowDragEnter)
+  window.removeEventListener('dragleave', onWindowDragLeave)
+  window.removeEventListener('dragover', onWindowDragOver)
+  window.removeEventListener('drop', onWindowDrop)
+})
 
 async function onContinue() {
   continuing.value = true
@@ -85,13 +239,7 @@ async function onContinue() {
 
 <template>
   <div class="page">
-    <header class="appbar">
-      <RouterLink to="/" class="title" title="Back to landing">
-        <h1>Granymede</h1>
-        <span class="meta">Setup · configure a new grading session</span>
-      </RouterLink>
-      <ThemeToggle />
-    </header>
+    <AppHeader subtitle="Setup · load the solution and the submissions" />
 
     <main class="body">
       <ol class="stepper">
@@ -99,36 +247,35 @@ async function onContinue() {
           <span class="dot">1</span> Solution file
         </li>
         <li :class="{ active: !!session.solution && !session.students.length, done: session.students.length > 0 }">
-          <span class="dot">2</span> Submissions zip
+          <span class="dot">2</span> Student submissions
         </li>
         <li :class="{ active: canContinue }">
           <span class="dot">3</span> Start grading
         </li>
       </ol>
+      <p class="drop-tip">
+        Drag your files onto this page — the solution and the students' .zip can go together, in one drop.
+      </p>
+      <p v-if="notice" class="notice" role="status">{{ notice }}</p>
 
       <!-- Step 1 -->
       <section class="card">
         <header class="card-head">
-          <h2><span class="num">1</span> Upload solution file</h2>
+          <h2><span class="num">1</span> Solution file</h2>
           <span class="card-meta">.ipynb or .py — questions detected automatically</span>
         </header>
         <div class="card-body">
-          <div class="upload">
-            <label class="file-input" :class="{ filled: !!solutionFile }">
-              <input type="file" accept=".ipynb,.py" @change="pickSolution" />
-              <span class="icon">{{ solutionFile ? '📄' : '⬆' }}</span>
-              <span class="text">{{ solutionFile?.name ?? 'Choose a .ipynb or .py file' }}</span>
-            </label>
-            <button class="btn btn-primary" :disabled="!solutionFile || loadingSolution" @click="onAnalyze">
-              <span v-if="loadingSolution" class="spin" />
-              {{ loadingSolution ? 'Analyzing…' : 'Analyze' }}
-            </button>
-          </div>
-          <p v-if="errorSolution" class="error">{{ errorSolution }}</p>
+          <FileDrop
+            class="zone-solution"
+            accept=".ipynb,.py"
+            v-bind="solutionZone"
+            :highlight="dragging"
+            @files="(f) => handleFiles(f, 'solution')"
+            @remove="removeSolution"
+          />
 
           <div v-if="session.solution" class="results">
             <div class="result-meta">
-              <span><strong>{{ session.solution.filename }}</strong></span>
               <span class="pill type">{{ session.solution.file_type }}</span>
               <span class="pill">
                 <strong>{{ enabledCount }}</strong> of {{ session.questions.length }} to grade
@@ -211,35 +358,27 @@ async function onContinue() {
       </section>
 
       <!-- Step 2 -->
-      <section class="card" :class="{ dimmed: !session.solution }">
+      <section class="card">
         <header class="card-head">
-          <h2><span class="num">2</span> Upload student submissions</h2>
-          <span class="card-meta">.zip with the Moodle-style folders inside</span>
+          <h2><span class="num">2</span> Student submissions</h2>
+          <span class="card-meta">a .zip, or the students' .py / .ipynb files</span>
         </header>
         <div class="card-body">
-          <div class="upload">
-            <label class="file-input" :class="{ filled: !!submissionsFile, disabled: !session.solution }">
-              <input type="file" accept=".zip" :disabled="!session.solution" @change="pickSubmissions" />
-              <span class="icon">{{ submissionsFile ? '📦' : '⬆' }}</span>
-              <span class="text">{{ submissionsFile?.name ?? 'Choose a zip with submission folders' }}</span>
-            </label>
-            <button class="btn btn-primary"
-              :disabled="!submissionsFile || !session.solution || loadingSubmissions"
-              @click="onUploadSubmissions">
-              <span v-if="loadingSubmissions" class="spin" />
-              {{ loadingSubmissions ? 'Uploading…' : 'Upload' }}
-            </button>
-          </div>
-          <p v-if="errorSubmissions" class="error">{{ errorSubmissions }}</p>
+          <FileDrop
+            class="zone-zip"
+            accept=".zip,.py,.ipynb"
+            multiple
+            v-bind="submissionsZone"
+            :highlight="dragging"
+            @files="(f) => handleFiles(f, 'students')"
+            @remove="removeStudents"
+          />
 
-          <div v-if="session.students.length" class="results">
+          <div v-if="session.students.length && session.warnings.length" class="results">
             <div class="result-meta">
-              <span><strong>{{ session.students.length }}</strong> students loaded</span>
-              <span v-if="session.warnings.length" class="pill warn">
-                {{ session.warnings.length }} warning(s)
-              </span>
+              <span class="pill warn">{{ session.warnings.length }} warning(s)</span>
             </div>
-            <details v-if="session.warnings.length" class="warn-details">
+            <details class="warn-details">
               <summary>Show warnings</summary>
               <ul>
                 <li v-for="(w, i) in session.warnings" :key="i">{{ w }}</li>
@@ -263,33 +402,6 @@ async function onContinue() {
 <style scoped>
 .page { min-height: 100vh; background: var(--bg-page); }
 
-/* Appbar */
-.appbar {
-  background: var(--header-bg);
-  color: var(--header-text);
-  padding: 0.7rem 1.25rem;
-  display: flex; align-items: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-.appbar h1 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-.appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
-.appbar .title {
-  display: flex;
-  flex-direction: column;
-  color: inherit;
-  text-decoration: none;
-  padding: 0.25rem 0.55rem;
-  margin: -0.25rem -0.55rem;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
-.appbar .title:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 2px; }
 
 /* Body */
 .body {
@@ -338,12 +450,11 @@ async function onContinue() {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-sm);
   transition: opacity 0.2s;
 }
-.card.dimmed { opacity: 0.55; }
 
 .card-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -363,27 +474,16 @@ async function onContinue() {
 .card-head .card-meta { font-size: 0.78rem; color: var(--text-muted); }
 .card-body { padding: 1rem 1.1rem; }
 
-/* Upload */
-.upload { display: flex; gap: 0.65rem; align-items: center; }
-.file-input {
-  flex: 1;
-  display: flex; align-items: center; gap: 0.55rem;
-  padding: 0.65rem 0.85rem;
-  background: var(--bg-soft);
-  border: 2px dashed var(--border-strong);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+.drop-tip { margin: -0.4rem 0 0; font-size: 0.85rem; color: var(--text-muted); text-align: center; }
+.notice {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: var(--warning-soft);
+  color: var(--warning-tx);
+  font-size: 0.85rem;
+  text-align: center;
 }
-.file-input:hover:not(.disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-.file-input.filled { border-style: solid; border-color: var(--success); background: var(--success-soft); }
-.file-input.disabled { cursor: not-allowed; opacity: 0.55; }
-.file-input input { display: none; }
-.file-input .icon { font-size: 1.05rem; }
-.file-input .text { font-size: 0.9rem; color: var(--text); }
 
 .error {
   margin-top: 0.7rem;

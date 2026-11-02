@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import '@fontsource-variable/source-serif-4'
 import { runtimeStage } from '../runtime/pyodide'
-import LandingIcon from '../components/LandingIcon.vue'
+import BrandMark from '../components/BrandMark.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import gradingShot from '../assets/landing/grading.jpg'
+import setupShot from '../assets/landing/setup.jpg'
+import consoleShot from '../assets/landing/console.jpg'
 
 const router = useRouter()
 
-const ctaLabel = computed(() => {
+const runtimeNote = computed(() => {
   switch (runtimeStage.value) {
     case 'ready':
-      return 'Start grading →'
-    case 'loading-runtime':
-      return 'Loading runtime…  Start grading'
-    case 'loading-modules':
-      return 'Loading modules…  Start grading'
+      return 'Python is loaded. The grading screens open straight away.'
     case 'error':
-      return 'Runtime failed — retry'
+      return 'Python failed to load. Reload the page to try again.'
     default:
-      return 'Start grading →'
+      return 'Python is loading in the background while you read.'
   }
 })
 
@@ -26,1237 +26,425 @@ function go() {
   router.push('/setup')
 }
 
-// --- Reveal-on-scroll ----------------------------------------------------
-// IntersectionObserver toggles the `in-view` class once a section enters
-// the viewport. Single observer instance, disconnected on unmount.
-let io: IntersectionObserver | null = null
-onMounted(() => {
-  if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
-  io = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          e.target.classList.add('in-view')
-          io?.unobserve(e.target)
-        }
-      }
-    },
-    { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
-  )
-  for (const el of document.querySelectorAll('.reveal')) {
-    io.observe(el)
-  }
-})
-onBeforeUnmount(() => {
-  io?.disconnect()
-  io = null
-})
+// Real input and output of anonymizer.py, shown in the privacy section.
+const studentFile = `# Nome: Ana Ribeiro
+# Número: 2023101
+# ana.ribeiro@alunos.exemplo.pt
+import math
+
+def area(r):
+    return math.pi * r ** 2`
+
+const sentFile = `# Nome: <REDACTED>
+# Número: <REDACTED>
+# <EMAIL>
+import math
+
+def area(r):
+    return math.pi * r ** 2`
 </script>
 
 <template>
   <div class="landing">
-    <!-- ==================== HERO ==================== -->
-    <header class="hero">
-      <nav class="topnav">
-        <span class="logo">Granymede</span>
-        <div class="topnav-actions">
+    <header class="masthead">
+      <div class="wrap masthead-inner">
+        <RouterLink to="/" class="brand"><BrandMark />Granymede</RouterLink>
+        <nav class="links" aria-label="On this page">
+          <a href="#how">How it works</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#faq">Questions</a>
+          <a href="https://github.com/PauloHCRocha/GradingToolJupyter2000" target="_blank" rel="noopener">Source</a>
           <ThemeToggle />
-        </div>
-      </nav>
-
-      <div class="hero-inner">
-        <div class="hero-text">
-          <div class="badge">
-            <span class="dot" />
-            100% in-browser · no uploads · zero accounts
-          </div>
-          <h1>
-            Grade Jupyter notebooks<br>
-            <span class="accent">faster and efficiently.</span>
-          </h1>
-          <p class="lead">
-            A focused grading workspace for Python and Jupyter assignments.
-            Question detection, side-by-side review, grade suggestions and
-            plagiarism analysis — fast enough to grade a class in an afternoon.
-          </p>
-          <div class="cta-row">
-            <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
-          </div>
-          <p class="micro">
-            <span v-if="runtimeStage === 'ready'" class="ok">✓ Runtime ready — opens instantly.</span>
-            <span v-else-if="runtimeStage === 'error'" class="warn">Runtime failed to load. Reload the page.</span>
-            <span v-else>Python runtime is loading in the background while you read…</span>
-          </p>
-        </div>
-
-        <div class="hero-art" aria-hidden="true">
-          <div class="window float">
-            <div class="win-bar">
-              <span class="dot r" />
-              <span class="dot y" />
-              <span class="dot g" />
-              <span class="win-title">grading.ipynb</span>
-            </div>
-            <div class="win-body">
-              <div class="cell md">
-                <div class="hl">Question 1 (2 points)</div>
-                <div class="muted">Count digits in a number using a while loop.</div>
-              </div>
-              <div class="cell code">
-                <span class="kw">def</span> <span class="fn">count_digits</span>(n):<br>
-                &nbsp;&nbsp;count = <span class="num">0</span><br>
-                &nbsp;&nbsp;<span class="kw">while</span> n > <span class="num">0</span>:<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;n //= <span class="num">10</span><br>
-                &nbsp;&nbsp;&nbsp;&nbsp;count += <span class="num">1</span><br>
-                &nbsp;&nbsp;<span class="kw">return</span> count
-              </div>
-              <div class="grade-strip">
-                <span class="qchip on">Q1-1</span>
-                <span class="qchip on">Q1-2</span>
-                <span class="qchip">Q2</span>
-                <span class="qchip">Q3</span>
-                <span class="qchip">Q4</span>
-                <span class="grade-score">11.5 / 20</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        </nav>
       </div>
-
     </header>
 
-    <!-- ==================== SPEED CLAIM ==================== -->
-    <section class="testimonial reveal">
-      <div class="quote-card">
-        <div class="stat">
-          <strong>3×</strong>
-          <span>faster grading</span>
+    <main>
+      <section class="intro wrap">
+        <p class="kicker">A grading tool for Python and Jupyter assignments</p>
+        <h1>Every answer next to your solution, one question at a time.</h1>
+        <p class="lead">
+          Load your solution and the students' files. Granymede finds the questions, puts each
+          answer beside yours, runs the code when you need it and keeps the grades. It all
+          happens in your browser, so the files never leave your computer.
+        </p>
+        <div class="cta">
+          <button class="start" @click="go">Start grading</button>
+          <a class="quiet" href="#how">How it works</a>
         </div>
-        <div class="claim">
-          <h2>Notebook grading, compressed.</h2>
+        <p class="runtime" :class="runtimeStage">{{ runtimeNote }}</p>
+
+        <figure class="shot hero-shot">
+          <img :src="gradingShot" width="2200" height="1034"
+               alt="The grading screen: question 1 for the student Bruno Costa, graded 1.5 out of 2, with the solution and his answer side by side." />
+          <figcaption>
+            Grading Bruno's answer to question 1. Your solution is on the left and his is on the right; the
+            grade and the comment go above.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="how" class="how wrap">
+        <h2>How a grading session goes</h2>
+        <ol class="steps">
+          <li class="step">
+            <div class="step-text">
+              <span class="step-n">Step 1</span>
+              <h3>Drop in your solution and the students' work</h3>
+              <p>
+                Your solution file, <code>.py</code> or <code>.ipynb</code>, tells Granymede where each question
+                starts and what it is worth. A comment such as <code># Q1 (2 points)</code> is enough, or a
+                markdown heading in a notebook. The students' files can come straight from the zip that Moodle
+                gives you, or one by one.
+              </p>
+            </div>
+            <figure class="shot">
+              <img :src="setupShot" width="1200" height="813" loading="lazy"
+                   alt="The setup screen with a solution file of three questions and a zip of four students loaded." />
+              <figcaption>Three questions found in the solution, four students in the zip.</figcaption>
+            </figure>
+          </li>
+          <li class="step wide">
+            <div class="step-text">
+              <span class="step-n">Step 2</span>
+              <h3>Read, run, grade</h3>
+              <p>
+                Move through the class with the arrow keys. For each question you see the statement, your
+                solution and the student's answer. When you are not sure the code works, run it: if it asks for
+                input you type it, as in a terminal, and you can run your solution with the same input to
+                compare the two.
+              </p>
+            </div>
+            <figure class="shot">
+              <img :src="consoleShot" width="2200" height="373" loading="lazy"
+                   alt="Two consoles side by side. With the input 21, the student's program prints 2121 and the solution prints 42." />
+              <figcaption>Bruno forgot <code>int()</code>: given 21, his program prints 2121 and the solution prints 42.</figcaption>
+            </figure>
+          </li>
+          <li class="step text-only">
+            <div class="step-text">
+              <span class="step-n">Step 3</span>
+              <h3>Export the grades</h3>
+              <p>
+                One CSV file with a row per student, a column per question and your comments, ready to import
+                into Moodle or open in a spreadsheet.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="more wrap">
+        <h2>What else it does</h2>
+        <dl class="spec">
+          <div>
+            <dt>Runs code safely</dt>
+            <dd>
+              In a separate Python inside the page, with a time limit, so an endless loop can't freeze the
+              tab. You edit a copy; the submission itself never changes.
+            </dd>
+          </div>
+          <div>
+            <dt>Suggests a grade</dt>
+            <dd>A simple comparison with your solution (structure, imports, output) proposes a grade. You decide.</dd>
+          </div>
+          <div>
+            <dt>Looks for copied work</dt>
+            <dd>Compares every pair of submissions and groups the similar ones, with a heatmap you can click through.</dd>
+          </div>
+          <div>
+            <dt>Spots pasted text</dt>
+            <dd>Flags the invisible Unicode characters that often come along when code is pasted from a chatbot.</dd>
+          </div>
+          <div>
+            <dt>Grades with Claude, if you want</dt>
+            <dd>
+              Optional. Claude drafts a rubric that you edit, then proposes a grade per criterion. Nothing counts
+              until you accept, change or reject it.
+            </dd>
+          </div>
+          <div>
+            <dt>Handles real files</dt>
+            <dd>Notebooks and plain scripts, Moodle folders or loose files, and files with syntax errors.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section id="privacy" class="privacy wrap">
+        <h2>Where the files go</h2>
+        <div class="privacy-text">
           <p>
-            Question detection, grade suggestions and side-by-side review
-            handle the mechanical parts of marking — the
-            <span class="hl">potential to grade roughly 3× faster</span>
-            on a typical Python or Jupyter assignment, leaving you with
-            just the judgment calls.
+            Nowhere. The page is a set of static files, and the Python that reads the submissions runs inside
+            your browser tab: it is <a href="https://pyodide.org" target="_blank" rel="noopener">Pyodide</a>,
+            Python compiled to WebAssembly. Nothing is uploaded, and closing the tab clears everything. Your
+            browser's network panel will show it.
+          </p>
+          <p>
+            The one exception is optional: grading with Claude, which you switch on with your own API key.
+            Before anything is sent, names, student numbers and e-mail addresses are replaced, and you can
+            preview exactly what goes out. This is what happens to the top of a file:
           </p>
         </div>
-      </div>
-    </section>
+        <div class="anon">
+          <figure>
+            <figcaption>In the student's file</figcaption>
+            <pre>{{ studentFile }}</pre>
+          </figure>
+          <figure>
+            <figcaption>What Claude receives</figcaption>
+            <pre>{{ sentFile }}</pre>
+          </figure>
+        </div>
+      </section>
 
-    <!-- ==================== WORKFLOW PREVIEW ==================== -->
-    <section class="workflow reveal">
-      <header class="section-head">
-        <h2>Inside the workspace</h2>
-        <p>Three views handle the whole flow — drop the solution, grade student-by-student, then surface suspicious pairs.</p>
-      </header>
-
-      <div class="screens">
-        <!-- Screen 1: Setup -->
-        <article class="screen reveal">
-          <div class="screen-tag">①  Setup</div>
-          <div class="mock">
-            <div class="mock-bar">
-              <span class="dot r" /><span class="dot y" /><span class="dot g" />
-              <span class="mock-title">Setup</span>
-            </div>
-            <div class="mock-body setup-mock">
-              <div class="filebox">
-                <span class="ico">📄</span>
-                <span class="fname">assignment_2_solution.ipynb</span>
-                <span class="ftag">analyzed</span>
-              </div>
-              <div class="meta-row">
-                <span class="pill ok">8 detected</span>
-                <span class="pill">20 pts total</span>
-                <span class="pill">7 to grade</span>
-              </div>
-              <div class="qrow"><span class="check on">✓</span><code>Q1-1</code><span class="bar"><i style="width: 40%" /></span><span class="pts">2 pt</span></div>
-              <div class="qrow"><span class="check on">✓</span><code>Q1-2</code><span class="bar"><i style="width: 40%" /></span><span class="pts">2 pt</span></div>
-              <div class="qrow"><span class="check on">✓</span><code>Q2</code><span class="bar"><i style="width: 70%" /></span><span class="pts">8 pt</span></div>
-              <div class="qrow off"><span class="check">✗</span><code>Q4</code><span class="bar"><i style="width: 30%" /></span><span class="pts">3 pt</span></div>
-              <div class="dropzone">⬆  Drop submissions.zip</div>
-            </div>
-          </div>
-        </article>
-
-        <!-- Screen 2: Grading -->
-        <article class="screen reveal">
-          <div class="screen-tag">②  Grading</div>
-          <div class="mock">
-            <div class="mock-bar navy">
-              <span class="dot r" /><span class="dot y" /><span class="dot g" />
-              <span class="mock-title">Grading workspace</span>
-            </div>
-            <div class="mock-body grading-mock">
-              <div class="g-top">
-                <button class="g-nav">‹</button>
-                <div class="g-name">
-                  <strong>Alice Martin</strong>
-                  <span>#10001 · 14 / 20</span>
-                </div>
-                <button class="g-nav">›</button>
-              </div>
-              <div class="g-chips">
-                <span class="qchip done">Q1-1</span>
-                <span class="qchip done">Q1-2</span>
-                <span class="qchip active">Q2</span>
-                <span class="qchip">Q3</span>
-                <span class="qchip">Q4</span>
-              </div>
-              <div class="g-pane">
-                <div class="g-col solution">
-                  <div class="lbl">📘 Solution</div>
-                  <div class="g-line"><span class="kw">def</span> <span class="fn">approximate_pi</span>(n):</div>
-                  <div class="g-line">  inside = <span class="num">0</span></div>
-                  <div class="g-line">  <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(n):</div>
-                </div>
-                <div class="g-col student">
-                  <div class="lbl">📝 Student</div>
-                  <div class="g-line"><span class="kw">def</span> <span class="fn">approximate_pi</span>(N):</div>
-                  <div class="g-line">  hit = <span class="num">0</span></div>
-                  <div class="g-line">  <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(N):</div>
-                </div>
-              </div>
-              <div class="g-actions">
-                <span class="suggest-pill">✨ Suggest 1.75 / 2</span>
-                <span class="comment-mini">"Use _ as loop var"</span>
-                <span class="btn-mini">Save</span>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <!-- Screen 3: Pair comparison -->
-        <article class="screen reveal">
-          <div class="screen-tag">③  Compare</div>
-          <div class="mock">
-            <div class="mock-bar navy">
-              <span class="dot r" /><span class="dot y" /><span class="dot g" />
-              <span class="mock-title">Compare pair</span>
-            </div>
-            <div class="mock-body compare-mock">
-              <div class="cmp-head">
-                <div class="cmp-pair">
-                  <strong>Adam F.</strong>
-                  <span class="cmp-arrow">↔</span>
-                  <strong>Bruno S.</strong>
-                </div>
-                <span class="cmp-score danger">96%</span>
-              </div>
-              <div class="cmp-q">
-                <code>Q4</code> <span class="cmp-q-sim">94%</span>
-                <span class="cmp-tag">⚠ Identical block</span>
-              </div>
-              <div class="cmp-codes">
-                <div class="cmp-col">
-                  <div class="cmp-line dim"><span class="kw">def</span> <span class="fn">approximate_pi</span>(N):</div>
-                  <div class="cmp-line dim">  inside = <span class="num">0</span></div>
-                  <div class="cmp-block exact">
-                    <span class="cmp-tag-mini">⚠</span>
-                    <div class="cmp-line"><span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(N):</div>
-                    <div class="cmp-line">  x = random()</div>
-                    <div class="cmp-line">  y = random()</div>
-                  </div>
-                  <div class="cmp-line dim">    inside += <span class="num">1</span></div>
-                </div>
-                <div class="cmp-col">
-                  <div class="cmp-line dim"><span class="kw">def</span> <span class="fn">approx_pi</span>(N):</div>
-                  <div class="cmp-line dim">  cnt = <span class="num">0</span></div>
-                  <div class="cmp-block exact">
-                    <span class="cmp-tag-mini">⚠</span>
-                    <div class="cmp-line"><span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(N):</div>
-                    <div class="cmp-line">  x = random()</div>
-                    <div class="cmp-line">  y = random()</div>
-                  </div>
-                  <div class="cmp-line dim">    cnt += <span class="num">1</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- ==================== FEATURES ==================== -->
-    <section class="features reveal">
-      <header class="section-head">
-        <h2>Built for the way you actually grade</h2>
-        <p>Six things you'd hand-roll if you had the time. They're already here.</p>
-      </header>
-      <div class="grid">
-        <article>
-          <div class="ico"><LandingIcon name="privacy" /></div>
-          <h3>Privacy by design</h3>
-          <p>There's no backend. Student files are read in the browser and stay there. Closing the tab clears everything. Opt-in auto-grading only ever sends anonymized code.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="detect" /></div>
-          <h3>Dynamic question detection</h3>
-          <p>Drop your solution and the questions, sub-questions and points are extracted from the markdown automatically.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="scale" /></div>
-          <h3>AI-free grade suggestions</h3>
-          <p>A transparent multi-criteria heuristic compares student code with your reference — imports, structures, output, and completeness.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="shield" /></div>
-          <h3>Plagiarism detection</h3>
-          <p>Hybrid similarity (TF-IDF + AST + token Jaccard) surfaces suspicious pairs, clusters and a full similarity matrix.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="play" /></div>
-          <h3>Run student code safely</h3>
-          <p>Execute submissions in a separate in-browser Python with a time limit, next to your solution's output. Edit a working copy freely — the submission never changes.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="split" /></div>
-          <h3>Side-by-side review</h3>
-          <p>Your reference and the student's notebook are shown next to each other — drag the splitter to give either side more room.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- ==================== HOW IT WORKS ==================== -->
-    <section class="how reveal">
-      <header class="section-head">
-        <h2>Three steps to a graded class</h2>
-      </header>
-      <ol class="steps">
-        <li>
-          <span class="num">1</span>
-          <h3>Upload your solution</h3>
-          <p>A <code>.ipynb</code> or <code>.py</code> with the reference answers. Questions and points are detected automatically. Untick the ones you're not grading this round.</p>
-        </li>
-        <li>
-          <span class="num">2</span>
-          <h3>Drop the submissions zip</h3>
-          <p>Moodle-style folders are recognized by name and number. Empty or broken files are flagged but don't break the run.</p>
-        </li>
-        <li>
-          <span class="num">3</span>
-          <h3>Grade, suggest, export</h3>
-          <p>Review side-by-side, accept the suggested grade or override, leave a comment, run the student's code in a sandbox, and export the gradebook as CSV.</p>
-        </li>
-      </ol>
-    </section>
-
-    <!-- ==================== WHO IT'S FOR ==================== -->
-    <section class="audience reveal">
-      <header class="section-head">
-        <h2>Built for the realities of teaching</h2>
-        <p>Three kinds of instructors keep us honest about what this tool needs to do.</p>
-      </header>
-      <div class="personas">
-        <article>
-          <div class="ico"><LandingIcon name="cap" /></div>
-          <h3>University professors</h3>
-          <p>Got a class of 80 Jupyter notebooks every assignment? Don't ship them through someone else's cloud. Run the whole grading workflow in your laptop's browser.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="bolt" /></div>
-          <h3>Bootcamp instructors</h3>
-          <p>Tight turnarounds, lots of submissions. The dynamic question detector and the multi-criteria suggester get you 60% of the grade in 0% of the time.</p>
-        </article>
-        <article>
-          <div class="ico"><LandingIcon name="users" /></div>
-          <h3>Teaching assistants</h3>
-          <p>You probably can't put student data on a third-party SaaS even if you wanted to. With this tool you don't have to ask — files literally cannot leave your machine.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- ==================== FAQ ==================== -->
-    <section class="faq reveal">
-      <header class="section-head">
-        <h2>Frequently asked, briefly answered</h2>
-      </header>
-      <div class="faq-grid">
+      <section id="faq" class="faq wrap">
+        <h2>Questions</h2>
         <details>
-          <summary>Is my students' data really private?</summary>
+          <summary>Does it work with plain <code>.py</code> files?</summary>
           <p>
-            Yes. The page is static; the only network requests it makes are to load
-            Pyodide (the Python runtime) and its packages from a CDN, and to load this
-            page itself from this site. Nothing about your files is sent anywhere —
-            unless you turn on Claude auto-grading with your own API key. Then only
-            anonymized code goes to the Claude API: names, student numbers, e-mails and
-            filenames are removed first, and you can preview exactly what is sent. You
-            can verify all of this in your browser's Network tab.
+            Yes. A comment at the start of a line such as <code># Q1 (2 points)</code> or
+            <code># Question 2</code> starts a question, and so does a block like
+            <code>"""ID: 1 / Label: … / Grade: 5 points"""</code>. A file with no markers at all is graded as
+            a single question.
           </p>
         </details>
         <details>
-          <summary>How big can the submissions zip be?</summary>
+          <summary>My solution doesn't use “Q1” headers. What now?</summary>
           <p>
-            Whatever your browser can hold in RAM. ~80 student notebooks (a few MB of
-            zip) work comfortably on any modern laptop. Multiple hundreds get sluggish
-            on the plagiarism step because the similarity matrix grows quadratically.
+            Granymede also understands <code>ID:</code>, <code>Label:</code> and <code>Grade:</code> blocks
+            (or <code>Pergunta</code>, <code>Enunciado</code>, <code>Cotação</code>). If nothing is found, it
+            tells you so on the setup screen and shows what a header should look like.
           </p>
         </details>
         <details>
-          <summary>Can I run the student's code? Is that safe?</summary>
+          <summary>Is running a student's code safe?</summary>
           <p>
-            Yes — the runner uses Pyodide's WebAssembly sandbox, which is the same
-            isolation the browser gives every page. The student's code can't touch
-            your filesystem, your microphone, or anything else outside the tab.
+            It runs in the browser's WebAssembly sandbox, in a worker of its own, so it can't reach your files,
+            the grades or anything outside the tab. A run that doesn't finish is stopped after the time limit
+            you choose.
           </p>
         </details>
         <details>
-          <summary>What if my solution doesn't follow the "Question N" pattern?</summary>
+          <summary>How big a class can it handle?</summary>
           <p>
-            The detector picks up <code>Question N</code>, <code>QN</code>,
-            <code>QN-M</code> with optional points like <code>(2 points)</code>. If
-            your file doesn't, you'll see no questions detected — adjust your markdown
-            or paste a renamed copy. You can also untick auto-detected ones you don't
-            want to grade.
+            Around a hundred submissions work comfortably on a normal laptop. The plagiarism check compares
+            every pair, so it slows down with several hundred.
           </p>
         </details>
         <details>
-          <summary>Does it work for plain <code>.py</code> files?</summary>
+          <summary>What exactly does Claude do, and what does it cost?</summary>
           <p>
-            Yes. A comment such as <code># Q1 (2 points)</code> or
-            <code># Question 2</code> at the start of a line (or a docstring
-            starting with one) begins a new question, and so does a block like
-            <code>"""ID: 1 / Label: … / Grade: 5 points"""</code> (Portuguese keys
-            such as <code>Pergunta</code>, <code>Enunciado</code> and
-            <code>Cotação</code> work too). <code># %%</code> cell markers are
-            honoured. A file with no markers at all is graded as a single question.
-            If a student renamed or removed a header, their whole file is shown.
+            For each question it drafts a solution and a rubric, which you edit. Then it reads each
+            anonymised submission and proposes points per criterion, with a short justification. Every grade
+            waits for you, and only the ones you accept go into the CSV. It uses your Anthropic API key, so the
+            cost goes to your account; the page shows an estimate as it runs.
           </p>
         </details>
         <details>
-          <summary>Can Claude grade the submissions for me?</summary>
+          <summary>Is anything stored?</summary>
           <p>
-            It can propose grades — you decide. Claude first drafts a solution and a
-            rubric for each question; you edit both. It then grades each anonymized
-            submission against your rubric, criterion by criterion, and every proposed
-            grade waits for you to accept, change or reject it next to the student's
-            code. Only accepted grades reach the CSV.
+            The browser keeps Python and the page's code in its cache, so later visits load faster. Files and
+            grades live only in the open tab. If you use Claude, your API key stays in that tab too, unless you
+            ask the page to remember it on this computer.
           </p>
         </details>
-        <details>
-          <summary>What gets cached and where?</summary>
-          <p>
-            Pyodide and a few JavaScript chunks are cached by the browser (HTTP
-            cache) on first visit, so subsequent loads are instant. Your files,
-            grades and plagiarism results live only in the tab's memory and are
-            wiped when you close it.
-          </p>
-        </details>
-      </div>
-    </section>
+      </section>
 
-    <!-- ==================== FINAL CTA ==================== -->
-    <section class="final-cta reveal">
-      <h2>Ready when you are.</h2>
-      <p>Drop a solution, drop a zip, start grading.</p>
-      <button class="btn btn-primary big" @click="go">{{ ctaLabel }}</button>
-    </section>
+      <section class="closing wrap">
+        <p>Ready to try it with your own class?</p>
+        <button class="start" @click="go">Start grading</button>
+      </section>
+    </main>
 
     <footer class="foot">
-      <p>Granymede · grading for Jupyter notebooks, in your browser</p>
+      <div class="wrap foot-inner">
+        <span><BrandMark />Granymede</span>
+        <span>
+          Made by <a href="https://paulohcrocha.com" target="_blank" rel="noopener">Paulo Rocha</a> ·
+          <a href="https://github.com/PauloHCRocha/GradingToolJupyter2000" target="_blank" rel="noopener">Source code</a>
+        </span>
+      </div>
     </footer>
   </div>
 </template>
 
-
 <style scoped>
 .landing {
-  background: var(--bg-page);
-  color: var(--text);
+  --paper: #fbfaf7;
+  --paper-2: #f3f1ea;
+  --ink: #1c1f24;
+  --ink-2: #4b5260;
+  --ink-3: #6f7685;
+  --rule: #e4e0d6;
+  --link: #1e4b8f;
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
   min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+:root[data-theme='dark'] .landing {
+  --paper: #121417;
+  --paper-2: #1a1d22;
+  --ink: #e9e7e2;
+  --ink-2: #b4b8c0;
+  --ink-3: #8a909b;
+  --rule: #2b3038;
+  --link: #8fb4ec;
 }
 
-/* ---------- Reveal-on-scroll ---------- */
-.reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-.reveal.in-view { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; transition: none; }
-}
-
-/* ==================== HERO ==================== */
-.hero {
-  background:
-    radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.20), transparent 55%),
-    radial-gradient(circle at 10% 80%, rgba(139, 92, 246, 0.16), transparent 55%),
-    radial-gradient(circle at 50% 110%, rgba(236, 72, 153, 0.10), transparent 60%),
-    linear-gradient(135deg, #1e3a5f 0%, #2c4a72 60%, #1e293b 100%);
-  color: white;
-  padding: 1rem 1.5rem 4rem;
-  position: relative;
-  overflow: hidden;
-}
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px);
-  background-size: 32px 32px;
-  pointer-events: none;
-  mask-image: linear-gradient(to bottom, black 60%, transparent);
-}
-
-.topnav {
-  display: flex; align-items: center; justify-content: space-between;
-  max-width: 1200px; margin: 0 auto 3rem;
-  position: relative; z-index: 1;
-}
-.topnav .logo {
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-.topnav-actions { display: flex; gap: 0.5rem; align-items: center; }
-
-.hero-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-  position: relative; z-index: 1;
-}
-
-.hero-text .badge {
-  display: inline-flex; align-items: center; gap: 0.45rem;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 999px;
-  padding: 0.3rem 0.85rem;
-  font-size: 0.78rem;
-  margin-bottom: 1.4rem;
-}
-.hero-text .badge .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #6ee7b7;
-  box-shadow: 0 0 10px #6ee7b7;
-  animation: pulse 2s ease-in-out infinite;
-}
-@keyframes pulse { 50% { opacity: 0.4; transform: scale(0.8); } }
-
-.hero-text h1 {
-  font-size: clamp(2.1rem, 4.6vw, 3.6rem);
-  line-height: 1.05;
-  margin: 0 0 1.2rem;
-  letter-spacing: -0.025em;
-  font-weight: 750;
-}
-.hero-text h1 .accent {
-  background: linear-gradient(120deg, #93c5fd 0%, #c4b5fd 50%, #f0abfc 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.hero-text .lead {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: rgba(255,255,255,0.86);
-  margin: 0 0 1.8rem;
-  max-width: 560px;
-}
-
-.cta-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.btn.big {
-  padding: 0.78rem 1.5rem;
-  font-size: 1rem;
-  border-radius: 8px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.btn.big.btn-primary {
-  background: white;
-  color: #1e3a5f;
-  border: none;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-  transition: transform 0.12s, box-shadow 0.15s;
-}
-.btn.big.btn-primary:hover { background: #f1f5f9; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.22); }
-.btn.big.ghost {
-  background: rgba(255,255,255,0.08);
-  color: white;
-  border: 1px solid rgba(255,255,255,0.25);
-  text-decoration: none;
-}
-.btn.big.ghost:hover { background: rgba(255,255,255,0.18); text-decoration: none; }
-
-.micro { font-size: 0.82rem; color: rgba(255,255,255,0.65); margin: 0.4rem 0 0; }
-.micro .ok { color: #6ee7b7; }
-.micro .warn { color: #fca5a5; }
-
-/* hero mockup window */
-.hero-art { display: flex; justify-content: center; }
-.window {
-  width: 100%; max-width: 460px;
-  background: #0f1d31;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 25px 50px rgba(0,0,0,0.35);
-  overflow: hidden;
+.wrap { max-width: 1120px; margin-left: auto; margin-right: auto; padding: 0 24px; }
+a { color: var(--link); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  transform: rotate(-1deg);
+  font-size: 0.86em;
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
 }
-.window.float { animation: float 6s ease-in-out infinite; }
-@keyframes float {
-  0%, 100% { transform: rotate(-1deg) translateY(0); }
-  50%      { transform: rotate(-1deg) translateY(-6px); }
-}
-.win-bar {
-  display: flex; align-items: center; gap: 0.45rem;
-  padding: 0.55rem 0.75rem;
-  background: #1a2942;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.win-bar .dot { width: 11px; height: 11px; border-radius: 50%; }
-.win-bar .dot.r { background: #ef4444; }
-.win-bar .dot.y { background: #f59e0b; }
-.win-bar .dot.g { background: #22c55e; }
-.win-bar .win-title { margin-left: auto; margin-right: auto; font-size: 0.78rem; color: rgba(255,255,255,0.55); }
-.win-body { padding: 0.85rem; font-size: 0.82rem; color: #e2e8f0; }
-.cell { padding: 0.65rem 0.85rem; border-radius: 6px; margin-bottom: 0.55rem; }
-.cell.md { background: rgba(167, 139, 250, 0.08); border-left: 3px solid #a78bfa; font-family: system-ui; font-size: 0.85rem; }
-.cell.md .hl { color: #ddd6fe; font-weight: 600; }
-.cell.md .muted { color: rgba(255,255,255,0.55); margin-top: 0.2rem; font-size: 0.8rem; }
-.cell.code { background: rgba(34, 197, 94, 0.06); border-left: 3px solid #22c55e; line-height: 1.55; font-size: 0.79rem; }
-.cell.code .kw { color: #c084fc; }
-.cell.code .fn { color: #fbbf24; }
-.cell.code .num { color: #5eead4; }
-.grade-strip {
-  display: flex; align-items: center; gap: 0.35rem;
-  padding: 0.55rem 0.6rem;
-  background: rgba(255,255,255,0.04);
-  border-radius: 6px;
-  font-family: ui-monospace, monospace; font-size: 0.75rem;
-}
-.qchip { padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
-.qchip.on { background: #2563eb; color: white; }
-.grade-score { margin-left: auto; color: #6ee7b7; font-weight: 600; }
+h1, h2, h3 { font-family: var(--serif); color: var(--ink); font-weight: 600; letter-spacing: -0.012em; }
 
-/* ==================== Testimonial / speed ==================== */
-.testimonial {
-  padding: 4rem 1.5rem 2.5rem;
-  background: var(--bg-page);
+/* masthead */
+.masthead { border-bottom: 1px solid var(--rule); }
+.masthead-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 64px; }
+.brand {
+  display: inline-flex; align-items: center;
+  font-family: var(--serif); font-size: 1.3rem; font-weight: 650;
+  color: var(--ink); text-decoration: none;
 }
-.quote-card {
-  max-width: 880px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 2rem;
-  padding: 1.7rem 2rem;
-  background: linear-gradient(135deg, var(--bg-card) 0%, var(--accent-soft) 100%);
-  border: 1px solid var(--accent-bd);
-  border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
-}
-.quote-card .stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-right: 1.6rem;
-  border-right: 1px solid var(--accent-bd);
-  min-width: 120px;
-}
-.quote-card .stat strong {
-  font-size: clamp(2.4rem, 4.5vw, 3.4rem);
-  line-height: 1;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-.quote-card .stat span {
-  margin-top: 0.35rem;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  text-align: center;
-}
-.quote-card .claim h2 {
-  margin: 0 0 0.4rem;
-  font-size: clamp(1.15rem, 2vw, 1.45rem);
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  color: var(--text-strong);
-  font-weight: 700;
-}
-.quote-card .claim p {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--text);
-}
-.quote-card .claim .hl {
-  color: var(--accent);
-  font-weight: 700;
-}
+.links { display: flex; align-items: center; gap: 1.4rem; font-size: 0.95rem; }
+.links a { color: var(--ink-2); text-decoration: none; }
+.links a:hover { color: var(--ink); text-decoration: underline; }
 
-@media (max-width: 700px) {
-  .quote-card {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    padding: 1.4rem 1.5rem;
-  }
-  .quote-card .stat {
-    border-right: none;
-    border-bottom: 1px solid var(--accent-bd);
-    padding-right: 0;
-    padding-bottom: 1rem;
-  }
-}
-
-/* ==================== Section heads ==================== */
-.section-head { max-width: 720px; margin: 0 auto 2.2rem; text-align: center; }
-.section-head h2 {
-  font-size: clamp(1.55rem, 3vw, 2.15rem);
-  letter-spacing: -0.015em;
-  color: var(--text-strong);
-  margin: 0 0 0.6rem;
-  font-weight: 700;
-}
-.section-head p { color: var(--text-muted); font-size: 1rem; margin: 0; line-height: 1.5; }
-
-/* ==================== Workflow preview ==================== */
-.workflow {
-  padding: 5rem 1.5rem;
-  background: var(--bg-page);
-}
-.screens {
-  max-width: 1300px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-}
-.screen {
-  position: relative;
-  display: flex; flex-direction: column;
-  transition: transform 0.2s, opacity 0.6s, transform 0.6s;
-}
-.screen:hover { transform: translateY(-4px); }
-.screen-tag {
-  display: inline-block;
-  font-size: 0.78rem;
+/* intro */
+.intro { padding-top: 72px; }
+.kicker { margin: 0 0 14px; color: var(--ink-3); font-size: 0.95rem; }
+h1 { margin: 0; max-width: 21ch; font-size: clamp(2.3rem, 5vw, 3.6rem); line-height: 1.08; }
+.lead { margin: 22px 0 0; max-width: 58ch; color: var(--ink-2); font-size: 1.15rem; }
+.cta { display: flex; align-items: center; gap: 1.5rem; margin-top: 30px; }
+.start {
+  padding: 0.75rem 1.4rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 1rem;
   font-weight: 600;
-  color: var(--accent);
-  background: var(--accent-soft);
-  padding: 0.2rem 0.7rem;
-  border-radius: 999px;
-  margin-bottom: 0.55rem;
-  align-self: flex-start;
+  transition: transform 0.12s, opacity 0.12s;
 }
-.mock {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
-  display: flex; flex-direction: column;
-}
-.mock-bar {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.5rem 0.7rem;
-  background: var(--bg-soft);
-  border-bottom: 1px solid var(--border);
-}
-.mock-bar.navy {
-  background: var(--header-bg);
-  border-bottom-color: rgba(255,255,255,0.1);
-}
-.mock-bar.navy .mock-title { color: rgba(255,255,255,0.85); }
-.mock-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
-.mock-bar .dot.r { background: #ef4444; }
-.mock-bar .dot.y { background: #f59e0b; }
-.mock-bar .dot.g { background: #22c55e; }
-.mock-bar .mock-title { margin-left: auto; margin-right: auto; font-size: 0.78rem; color: var(--text-muted); }
-.mock-body { padding: 0.85rem; min-height: 280px; }
+.start:hover { opacity: 0.88; }
+.start:active { transform: translateY(1px); }
+.quiet { color: var(--ink-2); }
+.runtime { margin: 14px 0 0; color: var(--ink-3); font-size: 0.85rem; }
+.runtime.error { color: #b42318; }
 
-/* Screen 1: Setup */
-.setup-mock { display: flex; flex-direction: column; gap: 0.5rem; }
-.filebox {
-  display: flex; align-items: center; gap: 0.45rem;
-  padding: 0.45rem 0.6rem;
-  background: var(--success-soft);
-  border: 1px solid var(--success-bd);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  color: var(--text);
-}
-.filebox .ico { font-size: 1rem; }
-.filebox .fname { font-family: ui-monospace, monospace; font-weight: 500; }
-.filebox .ftag {
-  margin-left: auto;
-  font-size: 0.68rem;
-  color: var(--success);
-  background: var(--bg-card);
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.meta-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-.meta-row .pill {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--bg-soft);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-}
-.meta-row .pill.ok {
-  background: var(--accent-soft);
-  color: var(--accent-tx);
-  border-color: var(--accent-bd);
-  font-weight: 600;
-}
-.dropzone {
-  margin-top: 0.2rem;
-  padding: 0.55rem 0.6rem;
-  border: 1px dashed var(--accent);
-  border-radius: 6px;
-  text-align: center;
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 500;
-  background: var(--accent-soft);
-}
-.qrow {
-  display: grid;
-  grid-template-columns: 18px 60px 1fr 36px;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.82rem;
-}
-.qrow.off { opacity: 0.4; }
-.qrow .check {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; border-radius: 4px;
-  background: var(--bg-soft); color: var(--text-muted);
-  border: 1px solid var(--border-strong);
-  font-size: 0.7rem;
-}
-.qrow .check.on { background: var(--success); color: white; border-color: var(--success); }
-.qrow code { background: var(--accent-soft); color: var(--accent-tx); padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; }
-.qrow .bar {
-  height: 6px;
-  background: var(--bg-soft);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.qrow .bar i {
+/* screenshots */
+.shot { margin: 0; }
+.shot img {
   display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), #93c5fd);
-  border-radius: 3px;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.04), 0 12px 32px -12px rgba(20, 20, 20, 0.18);
+  background: #fff;
 }
-.qrow .pts { font-size: 0.72rem; color: var(--text-muted); text-align: right; }
+:root[data-theme='dark'] .shot img { filter: brightness(0.92); box-shadow: none; }
+.shot figcaption { margin-top: 10px; color: var(--ink-3); font-size: 0.88rem; }
+.hero-shot { margin-top: 56px; }
 
-/* Screen 2: Grading */
-.grading-mock { display: flex; flex-direction: column; gap: 0.55rem; }
-.g-top {
-  display: flex; align-items: center; gap: 0.5rem;
-  background: var(--bg-soft);
-  border-radius: 6px;
-  padding: 0.35rem 0.5rem;
+/* sections */
+section + section { margin-top: 96px; }
+h2 { margin: 0 0 28px; padding-top: 28px; border-top: 1px solid var(--rule); font-size: 1.85rem; line-height: 1.2; }
+
+/* steps */
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 56px; }
+.step { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; align-items: start; }
+.step.text-only { grid-template-columns: minmax(0, 5fr); }
+/* A very wide screenshot reads better under the text, at full width. */
+.step.wide { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.step.wide .step-text { max-width: 62ch; }
+.step-n {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
-.g-nav {
-  width: 24px; height: 24px;
-  border-radius: 4px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card);
-  color: var(--text);
+.step h3 { margin: 0 0 10px; font-size: 1.35rem; line-height: 1.25; }
+.step p { margin: 0; color: var(--ink-2); }
+
+/* spec list */
+.spec { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+.spec > div { padding: 18px 0; border-bottom: 1px solid var(--rule); }
+.spec dt { font-weight: 650; color: var(--ink); }
+.spec dd { margin: 4px 0 0; color: var(--ink-2); }
+
+/* privacy */
+.privacy-text { max-width: 68ch; }
+.privacy-text p { margin: 0 0 14px; color: var(--ink-2); }
+.anon { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 24px; }
+.anon figure { margin: 0; }
+.anon figcaption { margin-bottom: 8px; font-size: 0.85rem; color: var(--ink-3); }
+.anon pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85rem;
-  display: inline-flex; align-items: center; justify-content: center;
-  cursor: default;
-}
-.g-name { flex: 1; display: flex; flex-direction: column; gap: 1px; text-align: center; }
-.g-name strong { font-size: 0.86rem; color: var(--text-strong); }
-.g-name span { font-size: 0.72rem; color: var(--text-muted); font-family: ui-monospace, monospace; }
-.g-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-.g-chips .qchip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.18rem 0.55rem;
-  border-radius: 4px;
-  font-size: 0.72rem;
-  background: var(--bg-soft);
-  color: var(--text);
-  font-family: ui-monospace, monospace;
-  border: 1px solid var(--border-strong);
-}
-.g-chips .qchip.done { border-color: var(--success); color: var(--success); }
-.g-chips .qchip.active { background: var(--accent); color: white; border-color: var(--accent); }
-.g-pane {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
-  font-family: ui-monospace, monospace;
-  font-size: 0.72rem;
-}
-.g-col {
-  padding: 0.45rem 0.55rem;
-  border-radius: 6px;
-  background: var(--code-bg);
-  border-left: 3px solid;
-}
-.g-col.solution { border-left-color: var(--accent); }
-.g-col.student { border-left-color: var(--success); }
-.g-col .lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 0.3rem; }
-.g-col .g-line { line-height: 1.4; }
-.g-col .kw { color: #8b5cf6; }
-.g-col .fn { color: #d97706; }
-.g-col .num { color: #0d9488; }
-.g-actions { display: flex; align-items: center; gap: 0.45rem; }
-.suggest-pill {
-  background: var(--warning-soft);
-  color: var(--warning-tx);
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-.comment-mini {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  font-style: italic;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.btn-mini {
-  margin-left: auto;
-  background: var(--accent); color: white;
-  padding: 0.25rem 0.7rem; border-radius: 4px;
-  font-size: 0.75rem; font-weight: 600;
+  line-height: 1.6;
+  color: var(--ink);
 }
 
-/* Screen 3: Pair compare */
-.compare-mock { display: flex; flex-direction: column; gap: 0.55rem; }
-.cmp-head {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.5rem 0.65rem;
-  background: var(--danger-soft);
-  border: 1px solid var(--danger-bd);
-  border-radius: 6px;
-}
-.cmp-pair { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; flex: 1; }
-.cmp-pair strong { color: var(--text-strong); }
-.cmp-arrow { color: var(--text-muted); }
-.cmp-score { font-weight: 700; font-size: 1rem; }
-.cmp-score.danger { color: var(--danger); }
-.cmp-q {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.55rem;
-  background: var(--bg-soft);
-  border-radius: 4px;
-  font-size: 0.78rem;
-}
-.cmp-q code {
-  background: var(--accent-soft);
-  color: var(--accent-tx);
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-.cmp-q-sim { color: var(--danger); font-weight: 600; font-family: ui-monospace, monospace; }
-.cmp-tag {
-  margin-left: auto;
-  font-size: 0.68rem;
-  color: var(--danger);
-  background: var(--bg-card);
-  border: 1px solid var(--danger-bd);
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-.cmp-codes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
-  font-family: ui-monospace, monospace;
-  font-size: 0.7rem;
-  line-height: 1.45;
-}
-.cmp-col {
-  padding: 0.4rem 0.5rem;
-  border-radius: 6px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-}
-.cmp-line { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cmp-line.dim { color: var(--text-muted); }
-.cmp-line .kw { color: #8b5cf6; }
-.cmp-line .fn { color: #d97706; }
-.cmp-line .num { color: #0d9488; }
-.cmp-block {
-  position: relative;
-  margin: 0.25rem -0.25rem;
-  padding: 0.3rem 0.4rem;
-  border-radius: 4px;
-}
-.cmp-block.exact {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(239, 68, 68, 0.06));
-  border: 1.5px solid var(--danger);
-}
-.cmp-tag-mini {
-  position: absolute;
-  top: -7px;
-  right: -3px;
-  background: var(--bg-card);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  font-size: 0.6rem;
-  padding: 0 4px;
-  border-radius: 3px;
-  line-height: 1.2;
-  font-family: system-ui, sans-serif;
-}
-
-/* ==================== Features ==================== */
-.features {
-  padding: 5rem 1.5rem;
-  background: var(--bg-card);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.features .grid {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-}
-.features article {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.4rem 1.4rem 1.5rem;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-}
-.features article:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-.features article .ico {
-  display: inline-flex;
-  width: 48px; height: 48px;
-  align-items: center; justify-content: center;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 10px;
-  margin-bottom: 0.85rem;
-  padding: 12px;
-  transition: background 0.15s, color 0.15s, transform 0.15s;
-}
-.features article:hover .ico {
-  background: var(--accent);
-  color: white;
-  transform: scale(1.05);
-}
-.features article h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--text-strong); }
-.features article p { margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.55; }
-
-/* ==================== How ==================== */
-.how { padding: 5rem 1.5rem; background: var(--bg-page); }
-.how .steps {
-  list-style: none; padding: 0;
-  max-width: 1100px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-}
-.how .steps li {
-  position: relative;
-  padding: 1.4rem;
-  background: var(--bg-card);
-  border-radius: 10px;
-  border: 1px solid var(--border);
-}
-.how .steps .num {
-  display: inline-flex;
-  align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  background: var(--accent);
-  color: white;
-  border-radius: 50%;
-  font-weight: 700;
-  margin-bottom: 0.7rem;
-}
-.how .steps h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: var(--text-strong); }
-.how .steps p { margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.55; }
-.how .steps code {
-  background: var(--accent-soft); color: var(--accent-tx);
-  padding: 1px 6px; border-radius: 3px;
-  font-size: 0.85em; border: 1px solid var(--accent-bd);
-}
-
-/* ==================== Audience ==================== */
-.audience {
-  padding: 5rem 1.5rem;
-  background: var(--bg-card);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.personas {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-}
-.personas article {
-  background: var(--bg-page);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.6rem;
-  text-align: left;
-  transition: border-color 0.15s, transform 0.15s;
-}
-.personas article:hover { border-color: var(--accent); transform: translateY(-2px); }
-.personas article .ico {
-  display: inline-flex;
-  width: 52px; height: 52px;
-  align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--accent-soft), rgba(139, 92, 246, 0.18));
-  color: var(--accent);
-  border-radius: 14px;
-  margin-bottom: 0.7rem;
-  padding: 13px;
-  transition: transform 0.15s;
-}
-.personas article:hover .ico { transform: rotate(-4deg) scale(1.06); }
-.personas article h3 { margin: 0 0 0.45rem; color: var(--text-strong); font-size: 1.05rem; }
-.personas article p { margin: 0; color: var(--text); font-size: 0.9rem; line-height: 1.55; }
-
-/* ==================== FAQ ==================== */
-.faq { padding: 5rem 1.5rem; background: var(--bg-card); border-top: 1px solid var(--border); }
-.faq-grid {
-  max-width: 900px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
-  /* Each <details> sizes itself; the adjacent cell shouldn't stretch to
-     match an open row, otherwise it looks like both opened together. */
-  align-items: start;
-}
-.faq details {
-  background: var(--bg-page);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
-  transition: border-color 0.15s;
-}
-.faq details:hover { border-color: var(--border-strong); }
-.faq details[open] { border-color: var(--accent); }
+/* faq */
+.faq details { border-bottom: 1px solid var(--rule); }
+.faq details:first-of-type { border-top: 1px solid var(--rule); }
 .faq summary {
   cursor: pointer;
   list-style: none;
-  font-weight: 600;
-  color: var(--text-strong);
+  padding: 16px 28px 16px 0;
   position: relative;
-  padding-right: 1.2rem;
-  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
 }
 .faq summary::-webkit-details-marker { display: none; }
 .faq summary::after {
   content: '+';
   position: absolute;
-  right: 0; top: 50%;
-  transform: translateY(-50%);
-  color: var(--accent);
+  right: 4px;
+  top: 14px;
+  color: var(--ink-3);
   font-weight: 400;
-  font-size: 1.3rem;
-  transition: transform 0.2s;
+  font-size: 1.2rem;
 }
 .faq details[open] summary::after { content: '–'; }
-.faq summary code {
-  background: var(--accent-soft);
-  color: var(--accent-tx);
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 0.85em;
-  font-weight: 500;
-}
-.faq details p {
-  margin: 0.7rem 0 0;
-  color: var(--text);
-  font-size: 0.92rem;
-  line-height: 1.55;
-}
-.faq details code {
-  background: var(--accent-soft);
-  color: var(--accent-tx);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 0.86em;
-}
+.faq details p { margin: 0 0 18px; max-width: 68ch; color: var(--ink-2); }
+.faq h2 { margin-bottom: 14px; }
 
-/* ==================== Final CTA ==================== */
-.final-cta {
-  padding: 5rem 1.5rem;
-  text-align: center;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.12), transparent 70%),
-    var(--bg-page);
-}
-.final-cta h2 {
-  font-size: clamp(1.7rem, 3.5vw, 2.5rem);
-  margin: 0 0 0.6rem;
-  color: var(--text-strong);
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-.final-cta p { color: var(--text-muted); margin: 0 0 1.5rem; font-size: 1.05rem; }
-.final-cta .btn.big.btn-primary {
-  background: var(--accent); color: white; border: none;
-  padding: 0.85rem 1.7rem; font-size: 1.05rem;
-}
-.final-cta .btn.big.btn-primary:hover { background: var(--accent-hover); }
+/* closing + footer */
+.closing { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; padding-top: 8px; padding-bottom: 96px; }
+.closing p { margin: 0; font-family: var(--serif); font-size: 1.5rem; color: var(--ink); }
+.foot { border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 0.9rem; }
+.foot-inner { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding-top: 22px; padding-bottom: 22px; }
+.foot-inner > span:first-child { display: inline-flex; align-items: center; font-family: var(--serif); font-weight: 600; color: var(--ink-2); }
+.foot a { color: var(--ink-2); }
 
-/* ==================== Footer ==================== */
-.foot {
-  padding: 2rem 1.5rem 3rem;
-  background: var(--header-bg);
-  color: rgba(255, 255, 255, 0.75);
-  text-align: center;
-  font-size: 0.85rem;
+@media (max-width: 860px) {
+  .step { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .spec, .anon { grid-template-columns: minmax(0, 1fr); }
+  .links a:not(:last-of-type) { display: none; }
 }
-.foot p { margin: 0; }
-.foot a { color: #93c5fd; }
-.foot a:hover { color: white; }
-
-/* ==================== responsive ==================== */
-@media (max-width: 1024px) {
-  .screens { grid-template-columns: 1fr; max-width: 600px; }
-  .features .grid { grid-template-columns: repeat(2, 1fr); }
-  .how .steps { grid-template-columns: 1fr; }
-  .personas { grid-template-columns: 1fr; }
-  .faq-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 700px) {
-  .hero { padding: 1rem 1.25rem 3rem; }
-  .hero-inner { grid-template-columns: 1fr; gap: 2rem; }
-  .hero-art { order: -1; }
-  .window { transform: none; max-width: 380px; }
-  .window.float { animation: none; }
-  .features .grid { grid-template-columns: 1fr; }
+@media (max-width: 520px) {
+  .intro { padding-top: 44px; }
+  .cta { flex-direction: column; align-items: flex-start; gap: 0.9rem; }
+  section + section { margin-top: 72px; }
 }
 </style>

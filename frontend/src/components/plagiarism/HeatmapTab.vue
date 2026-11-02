@@ -43,14 +43,25 @@ function palette() {
   }
 }
 
+// Room for the row labels (left) and the 45° column labels (top), sized
+// from the widest student id. Shared with cellAt() for hit-testing.
+const LABEL_FONT = '10px ui-monospace, SFMono-Regular, Menlo, monospace'
+let labelW = 40
+let labelH = 18
+
 function draw() {
   const cv = canvasEl.value
   if (!cv) return
   const N = n.value
   const cs = cellSize.value
-  const labelW = 40
-  const labelH = 18
-  const W = labelW + cs * N
+  const measure = cv.getContext('2d')
+  if (!measure) return
+  measure.font = LABEL_FONT
+  const widest = Math.min(140, Math.max(16, ...props.studentIds.map((id) => measure.measureText(id).width)))
+  labelW = Math.ceil(widest) + 10
+  labelH = Math.ceil(widest * Math.SQRT1_2) + 12
+  // The last column's label leans past the grid.
+  const W = labelW + cs * N + Math.ceil(widest * Math.SQRT1_2)
   const H = labelH + cs * N
   const dpr = window.devicePixelRatio || 1
   cv.width = Math.floor(W * dpr)
@@ -66,14 +77,18 @@ function draw() {
   ctx.fillStyle = p.bg
   ctx.fillRect(0, 0, W, H)
 
-  // Column labels (top)
+  // Column labels (top), tilted so long ids don't run into each other.
   ctx.fillStyle = p.label
-  ctx.font = '9px ui-monospace, monospace'
-  ctx.textAlign = 'center'
+  ctx.font = LABEL_FONT
   ctx.textBaseline = 'middle'
+  ctx.textAlign = 'left'
   for (let j = 0; j < N; j++) {
     if (cs >= 12 || j % 5 === 0) {
-      ctx.fillText(props.studentIds[j] ?? `${j}`, labelW + j * cs + cs / 2, labelH / 2)
+      ctx.save()
+      ctx.translate(labelW + j * cs + cs / 2, labelH - 6)
+      ctx.rotate(-Math.PI / 4)
+      ctx.fillText(props.studentIds[j] ?? `${j}`, 0, 0)
+      ctx.restore()
     }
   }
   ctx.textAlign = 'right'
@@ -108,8 +123,6 @@ function cellAt(ev: MouseEvent): { i: number; j: number } | null {
   const x = ev.clientX - rect.left
   const y = ev.clientY - rect.top
   const cs = cellSize.value
-  const labelW = 40
-  const labelH = 18
   if (x < labelW || y < labelH) return null
   const j = Math.floor((x - labelW) / cs)
   const i = Math.floor((y - labelH) / cs)

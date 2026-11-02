@@ -9,10 +9,13 @@ import type {
   StudentInfo,
 } from '../api/client'
 import {
+  clearSolution as apiClearSolution,
+  clearSubmissions as apiClearSubmissions,
   getSolutionCells,
   getStudentGrades,
   getSubmission,
   listSubmissions,
+  rematchSubmissions,
   setStudentGrade,
   updateQuestions,
 } from '../api/client'
@@ -22,6 +25,7 @@ export type SortOrder = 'name' | 'number'
 export const useSessionStore = defineStore('session', () => {
   const solution = ref<SolutionAnalysis | null>(null)
   const solutionDetail = ref<SolutionDetail | null>(null)
+  const solutionError = ref<string | null>(null)
   const questions = ref<DetectedQuestion[]>([])
   const students = ref<StudentInfo[]>([])
   const warnings = ref<string[]>([])
@@ -56,6 +60,8 @@ export const useSessionStore = defineStore('session', () => {
 
   function setSolution(analysis: SolutionAnalysis) {
     solution.value = analysis
+    // Cells of the previous solution file, if any — refetched on demand.
+    solutionDetail.value = null
     // Default `enabled` to true if the backend ever sends a question without
     // it (defensive — avoids hiding all questions on schema mismatch).
     questions.value = analysis.questions.map((q) => ({ ...q, enabled: q.enabled !== false }))
@@ -114,6 +120,13 @@ export const useSessionStore = defineStore('session', () => {
     delete workingCopies.value[studentId]
   }
 
+  /** After a new solution: re-link the loaded students to its questions. */
+  async function rematchStudents() {
+    await rematchSubmissions()
+    await refreshStudents()
+    if (selectedStudentId.value) await selectStudent(selectedStudentId.value)
+  }
+
   async function refreshStudents() {
     students.value = await listSubmissions(sortOrder.value)
   }
@@ -129,14 +142,31 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function ensureSolutionDetail() {
-    if (!solutionDetail.value) {
+    if (!solutionDetail.value && solution.value) {
+      solutionError.value = null
       try {
         solutionDetail.value = await getSolutionCells()
-      } catch {
+      } catch (e) {
         solutionDetail.value = null
+        solutionError.value = e instanceof Error ? e.message : String(e)
       }
     }
     return solutionDetail.value
+  }
+
+  /** Forget the solution file; loaded students and their grades stay. */
+  async function clearSolution() {
+    await apiClearSolution()
+    solution.value = null
+    solutionDetail.value = null
+    questions.value = []
+    selectedQuestionId.value = null
+  }
+
+  /** Forget the loaded submissions, and the grades given to them. */
+  async function clearStudents() {
+    await apiClearSubmissions()
+    setStudents([])
   }
 
   async function selectStudent(studentId: string) {
@@ -191,6 +221,7 @@ export const useSessionStore = defineStore('session', () => {
   return {
     solution,
     solutionDetail,
+    solutionError,
     questions,
     students,
     warnings,
@@ -213,8 +244,11 @@ export const useSessionStore = defineStore('session', () => {
     setWorkingCopy,
     resetWorkingCopy,
     refreshStudents,
+    rematchStudents,
     setSortOrder,
     ensureSolutionDetail,
+    clearSolution,
+    clearStudents,
     ensureValidSelectedQuestion,
     selectStudent,
     selectQuestion,

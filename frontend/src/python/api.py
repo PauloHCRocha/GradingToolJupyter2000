@@ -124,43 +124,70 @@ def get_solution_cells():
     }
 
 
-def upload_submissions(content):
-    records, warnings = submission_loader.load_zip(content)
-    if not records:
-        raise ValueError("No .ipynb or .py submissions found in the zip.")
+def _match_windows(rec, questions):
+    """Which of the student's cells answer each question."""
+    student_questions = question_window.detect_in_cells(rec.cells, rec.file_type)
+    if questions:
+        student_by_id = {q["id"]: q for q in student_questions}
+        merged = []
+        for q in questions:
+            sq = student_by_id.get(q["id"])
+            # Notebooks built from the same template line up cell by
+            # cell, so the solution's position is a fair guess. A .py
+            # file's cells depend on its own headers — no guessing;
+            # the UI falls back to the whole file instead.
+            fallback = q.get("cell_indices", []) if rec.file_type == "ipynb" else []
+            merged.append({
+                **q,
+                "cell_indices": sq["cell_indices"] if sq else fallback,
+            })
+        windows = question_window.compute_windows(rec.cells, merged)
+    else:
+        windows = question_window.compute_windows(rec.cells, student_questions)
+    rec.question_windows = _single_question_windows(rec.file_type, rec.cells, questions) or windows
 
+
+def _store_submissions(records, warnings):
+    if not records:
+        raise ValueError("No .ipynb or .py submissions found.")
     state.reset_submissions()
     questions = state.get_questions()
     for rec in records:
         if rec.cells:
-            student_questions = question_window.detect_in_cells(rec.cells, rec.file_type)
-            if questions:
-                student_by_id = {q["id"]: q for q in student_questions}
-                merged = []
-                for q in questions:
-                    sq = student_by_id.get(q["id"])
-                    # Notebooks built from the same template line up cell by
-                    # cell, so the solution's position is a fair guess. A .py
-                    # file's cells depend on its own headers — no guessing;
-                    # the UI falls back to the whole file instead.
-                    fallback = q.get("cell_indices", []) if rec.file_type == "ipynb" else []
-                    merged.append({
-                        **q,
-                        "cell_indices": sq["cell_indices"] if sq else fallback,
-                    })
-                rec.question_windows = question_window.compute_windows(rec.cells, merged)
-            else:
-                rec.question_windows = question_window.compute_windows(rec.cells, student_questions)
-            rec.question_windows = (
-                _single_question_windows(rec.file_type, rec.cells, questions) or rec.question_windows
-            )
+            _match_windows(rec, questions)
             rec.invisible_findings = ai_detection.detect_invisible(rec.cells)
         state.add_student(rec)
-
     return {
         "students": [_student_info(r) for r in state.list_students_sorted_by_name()],
         "warnings": warnings,
     }
+
+
+def upload_submissions(content):
+    return _store_submissions(*submission_loader.load_zip(content))
+
+
+def upload_submission_files(files):
+    """Students' .py / .ipynb files dropped one by one instead of a zip."""
+    return _store_submissions(*submission_loader.load_files(files))
+
+
+def clear_solution():
+    state.clear_solution()
+
+
+def clear_submissions():
+    state.reset_submissions()
+
+
+def rematch_submissions():
+    """A new solution file was analyzed: match the loaded submissions to its
+    questions again. Grades already given are kept."""
+    questions = state.get_questions()
+    for rec in state.list_students_ordered():
+        if rec.cells:
+            _match_windows(rec, questions)
+    return [_student_info(r) for r in state.list_students_sorted_by_name()]
 
 
 def list_submissions(sort="name"):

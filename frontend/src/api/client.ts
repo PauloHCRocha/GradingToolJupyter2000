@@ -215,6 +215,26 @@ export async function uploadSubmissions(file: File): Promise<SubmissionsUploadRe
   return callApi<SubmissionsUploadResult>('upload_submissions', bytes)
 }
 
+/** Students' .py / .ipynb files dropped one by one instead of a zip. */
+export async function uploadSubmissionFiles(files: File[]): Promise<SubmissionsUploadResult> {
+  const payload = await Promise.all(files.map(async (f) => ({ name: f.name, content: await fileBytes(f) })))
+  return callApi<SubmissionsUploadResult>('upload_submission_files', payload)
+}
+
+export async function clearSolution(): Promise<void> {
+  await callApi('clear_solution')
+}
+
+export async function clearSubmissions(): Promise<void> {
+  await callApi('clear_submissions')
+}
+
+/** Match the loaded submissions to a newly analyzed solution's questions,
+ *  keeping the grades given so far. */
+export async function rematchSubmissions(): Promise<StudentInfo[]> {
+  return callApi<StudentInfo[]>('rematch_submissions')
+}
+
 export async function listSubmissions(sort: 'name' | 'number' = 'name'): Promise<StudentInfo[]> {
   return callApi<StudentInfo[]>('list_submissions', sort)
 }

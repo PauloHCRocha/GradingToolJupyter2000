@@ -1,3 +1,5 @@
+<p align="center"><img src="frontend/public/favicon.svg" width="96" alt="Granymede logo"></p>
+
 # Granymede
 
 > Repo name `GradingToolJupyter2000` is the legacy slug; the product brand is **Granymede**.
@@ -17,8 +19,14 @@ served as static files from GitHub Pages; no upload happens at any point.
 
 ## Features
 
-- Upload a solution file (`.ipynb` or `.py`) — questions detected automatically
-- Upload a `.zip` of student submissions (Moodle-style folders)
+- Drag & drop (or pick) the solution file (`.ipynb` or `.py`) and the students'
+  work — a `.zip` (Moodle-style folders, one folder per student, or one file per
+  student) or the `.py` / `.ipynb` files themselves. Each is processed as soon as it
+  arrives; a solution and a zip can be dropped together anywhere on the setup page,
+  and students that arrive first wait for the solution. Either can be removed again.
+  Questions are detected automatically.
+- Swapping the solution later re-matches the loaded submissions to the new
+  questions and keeps the grades already given
 - Side-by-side viewer (solution vs. student) per question, or the whole file
 - Per-question grading with quick-grade buttons and inline comments
 - **Suggest grade** — multi-criteria heuristic comparing student code with the reference
