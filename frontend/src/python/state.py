@@ -42,6 +42,11 @@ def reset_submissions():
 
 def reset_all():
     reset_submissions()
+    clear_solution()
+
+
+def clear_solution():
+    """Forget the solution file and its questions; loaded students stay."""
     _state.questions.clear()
     _state.solution_filename = None
     _state.solution_file_type = None

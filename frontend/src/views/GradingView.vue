@@ -10,7 +10,7 @@ import { useRunConsole } from '../runtime/runConsole'
 import NotebookViewer from '../components/NotebookViewer.vue'
 import CodeEditor from '../components/CodeEditor.vue'
 import RunConsole from '../components/RunConsole.vue'
-import ThemeToggle from '../components/ThemeToggle.vue'
+import AppHeader from '../components/AppHeader.vue'
 
 const session = useSessionStore()
 const autograde = useAutogradeStore()
@@ -105,6 +105,9 @@ const totalCurrent = computed(() => {
   )
 })
 const gradedCount = computed(() => session.students.filter((s) => s.total_grade > 0).length)
+const studentPosition = computed(() =>
+  session.currentIndex >= 0 ? `${session.currentIndex + 1} of ${session.students.length}` : '',
+)
 
 const selectedQuestion = computed(() =>
   session.enabledQuestions.find((q) => q.id === session.selectedQuestionId) ?? null,
@@ -213,6 +216,27 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
 })
+
+// Setup may still be finishing (a new solution or zip) when this view
+// opens: reload whatever went missing instead of leaving the panes empty.
+watch(
+  () => session.solution && !session.solutionDetail,
+  (missing) => {
+    if (missing) void session.ensureSolutionDetail()
+  },
+)
+watch(
+  () => !session.selectedStudentId && session.students.some((s) => !s.has_error),
+  (none) => {
+    if (none) void selectStudent(session.students.find((s) => !s.has_error)!.id)
+  },
+)
+
+async function retryLoad() {
+  error.value = null
+  await session.ensureSolutionDetail()
+  if (session.selectedStudentId) await selectStudent(session.selectedStudentId)
+}
 
 function onKeyDown(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement)?.tagName
@@ -337,108 +361,66 @@ function gradeFor(qid: string): number | null {
 
 <template>
   <div class="page">
-    <header class="appbar">
-      <RouterLink to="/" class="title" title="Back to landing">
-        <h1>Granymede</h1>
-        <span class="meta">
-          Grading ·
-          {{ session.students.length }} students · {{ gradedCount }} graded ·
-          {{ session.enabledQuestions.length }}<template v-if="session.questions.length !== session.enabledQuestions.length">/{{ session.questions.length }}</template>
-          questions ({{ totalMax }} pts total)
-        </span>
-      </RouterLink>
-      <div class="actions">
-        <button class="btn" @click="router.push('/setup')">← Setup</button>
+    <AppHeader :subtitle="`${session.students.length} students · ${gradedCount} graded · ${session.enabledQuestions.length} questions · ${totalMax} pts`">
+      <template #actions>
         <button class="btn btn-primary" @click="downloadGradesCsv">Export CSV</button>
-        <button class="btn btn-ai" @click="router.push('/autograde')">
-          Auto-grade<template v-if="autograde.pendingCount"> · {{ autograde.pendingCount }} to review</template>
-        </button>
-        <button class="btn btn-warn" @click="router.push('/plagiarism')">Plagiarism</button>
-        <ThemeToggle />
-      </div>
-    </header>
+      </template>
+    </AppHeader>
 
-    <nav class="topnav">
-      <button class="btn nav-btn" @click="session.navigate(-1).then(syncDraft)">
+    <nav class="student-bar" aria-label="Student">
+      <button class="btn nav-btn" title="Previous student (←)" @click="session.navigate(-1).then(syncDraft)">
         <kbd>←</kbd> Previous
       </button>
-      <div class="cur-student">
-        <span v-if="session.studentDetail" class="cs-name">
-          {{ session.studentDetail.info.name }}
-        </span>
-        <span v-if="session.studentDetail" class="cs-meta">
-          #{{ session.studentDetail.info.id }} ·
-          <code>{{ session.studentDetail.info.filename }}</code>
-        </span>
+      <div class="student-main">
+        <template v-if="session.studentDetail">
+          <span class="cs-name">{{ session.studentDetail.info.name }}</span>
+          <span class="cs-meta">
+            #{{ session.studentDetail.info.id }} · <code>{{ session.studentDetail.info.filename }}</code>
+            <template v-if="studentPosition"> · {{ studentPosition }}</template>
+          </span>
+        </template>
         <span v-else class="cs-meta muted">No student selected</span>
-        <span class="kbd-hint">
-          Use <kbd>←</kbd><kbd>→</kbd> to switch students
+      </div>
+      <div class="student-tools">
+        <div class="sort-toggle" role="group" aria-label="Sort students by">
+          <button :class="{ active: session.sortOrder === 'name' }" @click="session.setSortOrder('name')">Name</button>
+          <button :class="{ active: session.sortOrder === 'number' }" @click="session.setSortOrder('number')">Number</button>
+        </div>
+        <select class="student-select" aria-label="Jump to student" :value="session.selectedStudentId" @change="onStudentChange">
+          <option value="" disabled>— pick a student —</option>
+          <option v-for="s in session.students" :key="s.id" :value="s.id" :disabled="s.has_error">
+            {{ s.name }} (#{{ s.id }})
+            <template v-if="s.total_grade > 0">— {{ s.total_grade.toFixed(1) }}/{{ totalMax }}</template>
+            <template v-if="s.invisible_count">⚠ {{ s.invisible_count }}</template>
+            <template v-if="s.has_error">⚠ error</template>
+          </option>
+        </select>
+        <span class="total-badge tnum" title="This student's total">
+          <span class="lbl">Total</span>
+          <strong>{{ totalCurrent.toFixed(1) }}</strong> / {{ totalMax }}
         </span>
       </div>
-      <button class="btn nav-btn" @click="session.navigate(+1).then(syncDraft)">
+      <button class="btn nav-btn" title="Next student (→)" @click="session.navigate(+1).then(syncDraft)">
         Next <kbd>→</kbd>
       </button>
     </nav>
 
     <main class="body">
-      <section class="row split">
-        <article class="card selector">
-          <header class="card-head">
-            <h3>Select student</h3>
-            <div class="sort-toggle">
-              <span class="lbl">Sort by</span>
-              <button :class="{ active: session.sortOrder === 'name' }"
-                      @click="session.setSortOrder('name')">Name</button>
-              <button :class="{ active: session.sortOrder === 'number' }"
-                      @click="session.setSortOrder('number')">Number</button>
-            </div>
-          </header>
-          <select class="student-select" :value="session.selectedStudentId" @change="onStudentChange">
-            <option value="" disabled>— pick a student —</option>
-            <option v-for="s in session.students" :key="s.id" :value="s.id" :disabled="s.has_error">
-              {{ s.name }} (#{{ s.id }})
-              <template v-if="s.total_grade > 0">— {{ s.total_grade.toFixed(1) }}/{{ totalMax }}</template>
-              <template v-if="s.invisible_count">⚠ {{ s.invisible_count }}</template>
-              <template v-if="s.has_error">⚠ error</template>
-            </option>
-          </select>
-          <div v-if="session.studentDetail?.invisible_findings.length" class="alert warn">
-            ⚠ <strong>{{ session.studentDetail.invisible_findings.length }}</strong>
-            suspicious unicode character(s) detected in code (possible AI paste).
-          </div>
-        </article>
-
-        <article class="card summary">
-          <header class="card-head"><h3>Grade summary</h3></header>
-          <ul class="summary-list">
-            <li v-for="q in session.enabledQuestions" :key="q.id"
-                :class="{ done: gradeFor(q.id) !== null && (gradeFor(q.id) ?? 0) > 0 }">
-              <span class="qid">{{ q.id }}</span>
-              <span class="qval">
-                <template v-if="gradeFor(q.id) !== null">
-                  {{ gradeFor(q.id)?.toFixed(2) }}
-                </template>
-                <template v-else>—</template>
-                <span class="qmax"> / {{ q.max_points }}</span>
-              </span>
-            </li>
-            <li class="total">
-              <span class="qid">Total</span>
-              <span class="qval"><strong>{{ totalCurrent.toFixed(1) }}</strong> / {{ totalMax }}</span>
-            </li>
-          </ul>
-        </article>
-      </section>
+      <div v-if="session.studentDetail?.invisible_findings.length" class="alert warn">
+        ⚠ <strong>{{ session.studentDetail.invisible_findings.length }}</strong>
+        suspicious unicode character(s) in this submission's code (possible AI paste).
+      </div>
 
       <section class="card questions">
-        <header class="card-head"><h3>Questions</h3></header>
         <div class="qbar">
           <button v-for="q in session.enabledQuestions" :key="q.id"
-                  class="qchip"
-                  :class="{ active: q.id === session.selectedQuestionId, graded: (gradeFor(q.id) ?? 0) > 0 }"
+                  class="qchip tnum"
+                  :class="{ active: q.id === session.selectedQuestionId, graded: gradeFor(q.id) !== null }"
                   @click="session.selectQuestion(q.id)">
             <span class="qchip-id">{{ q.id }}</span>
-            <span class="qchip-pts">{{ q.max_points }}pt</span>
+            <span class="qchip-pts">
+              <template v-if="gradeFor(q.id) !== null">{{ gradeFor(q.id) }}</template><template v-else>–</template>/{{ q.max_points }}
+            </span>
           </button>
           <p v-if="!session.enabledQuestions.length" class="hint">
             No questions selected for grading. Re-enable some in Setup.
@@ -494,7 +476,7 @@ function gradeFor(qid: string): number | null {
             <strong>{{ lastSuggest.points }} / {{ lastSuggest.max_points }}</strong>
             · score {{ Math.round(lastSuggest.score * 100) }}%
           </header>
-          <pre class="suggest-comment">{{ lastSuggest.comment }}</pre>
+          <span class="suggest-note">Points and comment filled in above — review them and save.</span>
         </div>
 
         <div v-if="aiResult" class="ai-result">
@@ -531,9 +513,17 @@ function gradeFor(qid: string): number | null {
         </div>
       </section>
 
+      <div v-if="error || session.solutionError" class="alert err load-error" role="alert">
+        <span>
+          Couldn't load the code:
+          <code>{{ error || session.solutionError }}</code>
+        </span>
+        <button class="btn btn-small" @click="retryLoad">Try again</button>
+      </div>
+
       <div v-if="session.selectedStudentId" class="scope-row">
-        <div class="sort-toggle">
-          <span class="lbl">Show</span>
+        <span class="scope-lbl">Show</span>
+        <div class="sort-toggle" role="group" aria-label="Show">
           <button :class="{ active: viewScope === 'question' }" @click="viewScope = 'question'">This question</button>
           <button :class="{ active: viewScope === 'file' }" @click="viewScope = 'file'">Whole file</button>
         </div>
@@ -650,64 +640,44 @@ function gradeFor(qid: string): number | null {
   background: var(--bg-page);
 }
 
-/* ---- App bar ---- */
-.appbar {
-  background: var(--header-bg);
-  color: var(--header-text);
-  padding: 0.7rem 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-.appbar h1 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-.appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
-.appbar .title {
-  display: flex;
-  flex-direction: column;
-  color: inherit;
-  text-decoration: none;
-  padding: 0.25rem 0.55rem;
-  margin: -0.25rem -0.55rem;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
-.appbar .title:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 2px; }
-.appbar .actions { display: flex; gap: 0.5rem; }
-.appbar .btn {
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.25);
-  color: white;
-}
-.appbar .btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
-.appbar .btn-primary { background: var(--accent); border-color: var(--accent); }
-.appbar .btn-warn { background: var(--warning); border-color: var(--warning); color: white; }
-.appbar .btn-warn:hover:not(:disabled) { background: #b45309; border-color: #b45309; }
-.appbar .btn-ai { background: var(--ai); border-color: var(--ai); color: white; }
-.appbar .btn-ai:hover:not(:disabled) { background: var(--ai-hover); border-color: var(--ai-hover); }
 
-/* ---- Top nav ---- */
-.topnav {
+/* ---- Student bar: who is being graded, always in view ---- */
+.student-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.6rem 1.25rem;
-  background: var(--bg-card);
+  flex-wrap: wrap;
+  padding: 0.55rem 1.25rem;
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
 }
-.nav-btn { min-width: 100px; }
-.cur-student { flex: 1; display: flex; flex-direction: column; align-items: center; }
-.cs-name { font-weight: 600; color: var(--text-strong); font-size: 0.95rem; }
+.nav-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.nav-btn kbd { font-size: 0.72rem; padding: 0 5px; }
+.student-main { flex: 1; min-width: 180px; display: flex; flex-direction: column; line-height: 1.3; }
+.cs-name { font-weight: 650; color: var(--text-strong); font-size: 1.05rem; letter-spacing: -0.01em; }
 .cs-meta { font-size: 0.78rem; color: var(--text-muted); }
-.cs-meta code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.cs-meta code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--code-border); }
 .cs-meta.muted { font-style: italic; }
+.student-tools { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.total-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-bd);
+  color: var(--accent-tx);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.total-badge .lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
+.total-badge strong { font-size: 1.05rem; }
 
 /* ---- Body ---- */
 .body {
@@ -718,8 +688,6 @@ function gradeFor(qid: string): number | null {
   flex-direction: column;
   gap: 0.85rem;
 }
-
-.row.split { display: grid; grid-template-columns: 2fr 1fr; gap: 0.85rem; }
 
 /* Code-row uses flex with a draggable splitter so the user can resize the
    solution / student panes by dragging the bar between them (double-click to
@@ -769,9 +737,9 @@ function gradeFor(qid: string): number | null {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 .card-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -785,22 +753,27 @@ function gradeFor(qid: string): number | null {
 .card-head .card-meta strong { color: var(--text-strong); }
 .muted { color: var(--text-muted); }
 
-/* selector card */
-.selector { padding: 0; }
-.selector .card-head { gap: 0.5rem; }
-.sort-toggle { display: flex; gap: 0.25rem; align-items: center; }
-.sort-toggle .lbl { font-size: 0.72rem; color: var(--text-muted); margin-right: 0.2rem; }
-.sort-toggle button {
-  background: var(--bg-card); border: 1px solid var(--border-strong);
-  color: var(--text); padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.78rem;
+.sort-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--bg-soft);
 }
-.sort-toggle button.active { background: var(--accent); border-color: var(--accent); color: white; }
+.sort-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.22rem 0.6rem;
+  border-radius: 5px;
+  font-size: 0.78rem;
+}
+.sort-toggle button:hover { color: var(--text); }
+.sort-toggle button.active { background: var(--bg-card); color: var(--text-strong); font-weight: 600; box-shadow: var(--shadow-sm); }
 .student-select {
-  width: calc(100% - 1.6rem);
-  margin: 0.7rem 0.8rem 0.4rem;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.92rem;
-  font-family: inherit;
+  max-width: 280px;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
 }
 .hint { color: var(--text-muted); font-size: 0.75rem; padding: 0 0.85rem 0.7rem; margin: 0; }
 .alert {
@@ -810,63 +783,48 @@ function gradeFor(qid: string): number | null {
   font-size: 0.82rem;
 }
 .alert.warn { background: var(--warning-soft); color: var(--warning-tx); border-left: 3px solid var(--warning); }
-
-/* summary card */
-.summary-list { list-style: none; margin: 0; padding: 0.5rem 0; }
-.summary-list li {
-  display: flex; justify-content: space-between;
-  padding: 0.35rem 0.9rem;
-  font-size: 0.85rem;
-  border-bottom: 1px dashed var(--border);
-}
-.summary-list li:last-child { border-bottom: none; }
-.summary-list .qid { color: var(--text-muted); font-family: ui-monospace, monospace; }
-.summary-list .qmax { color: var(--text-muted); }
-.summary-list li.done .qval { color: var(--success); font-weight: 600; }
-.summary-list li.total {
-  border-top: 1px solid var(--border-strong);
-  border-bottom: none;
-  background: var(--bg-soft);
-  margin-top: 0.3rem;
-  padding: 0.5rem 0.9rem;
-  font-weight: 600;
-}
-.summary-list li.total .qid { color: var(--text-strong); }
-.summary-list li.total .qval strong { color: var(--accent); font-size: 1.05rem; }
+.alert.err { background: var(--danger-soft); color: var(--danger-tx); border-left: 3px solid var(--danger); }
+.load-error { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.load-error code { font-size: 0.8rem; }
 
 /* questions */
 .qbar {
-  display: flex; flex-wrap: wrap; gap: 0.35rem;
-  padding: 0.7rem 0.9rem 0.4rem;
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  padding: 0.75rem 0.9rem 0.45rem;
 }
 .qchip {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.35rem 0.7rem;
+  display: inline-flex; align-items: baseline; gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
   background: var(--bg-card);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  font-size: 0.85rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
   color: var(--text);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-.qchip:hover { background: var(--bg-soft); }
-.qchip-id { font-family: ui-monospace, monospace; font-weight: 600; }
-.qchip-pts { font-size: 0.72rem; color: var(--text-muted); }
-.qchip.graded { border-color: var(--success); }
-.qchip.graded .qchip-pts { color: var(--success); }
+.qchip:hover { background: var(--bg-soft); border-color: var(--accent); }
+.qchip-id { font-family: ui-monospace, monospace; font-weight: 700; }
+.qchip-pts { font-size: 0.76rem; color: var(--text-muted); }
+.qchip.graded { border-color: var(--success-bd); background: var(--success-soft); }
+.qchip.graded .qchip-pts { color: var(--success-tx); font-weight: 600; }
 .qchip.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--primary);
+  border-color: var(--primary);
   color: white;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 .qchip.active .qchip-pts { color: rgba(255,255,255,0.85); }
 .qstatement {
-  margin: 0.3rem 0.9rem 0.85rem;
-  padding: 0.55rem 0.7rem;
-  background: var(--accent-soft);
+  margin: 0.25rem 0.9rem 0.85rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  color: var(--accent-tx);
+  border-radius: 6px;
+  font-size: 0.87rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
 }
 
 /* grading */
@@ -935,17 +893,7 @@ function gradeFor(qid: string): number | null {
 .conf-pill.medium { background: var(--warning-soft); color: var(--warning-tx); }
 .conf-pill.low { background: var(--danger-soft); color: var(--danger-tx); }
 .conf-pill.none { background: var(--border); color: var(--text-muted); }
-.suggest-comment {
-  margin: 0.5rem 0 0;
-  padding: 0.6rem 0.7rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.83rem;
-  color: var(--text);
-  white-space: pre-wrap;
-  font-family: inherit;
-}
+.suggest-note { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; }
 
 /* Claude result */
 .ai-result {
@@ -984,7 +932,8 @@ function gradeFor(qid: string): number | null {
 .ai-flags { margin: 0.4rem 0 0; font-size: 0.82rem; color: var(--danger-tx); }
 .ai-error { color: var(--danger-tx); font-size: 0.85rem; }
 
-.scope-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: -0.35rem; }
+.scope-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: -0.35rem; }
+.scope-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .scope-note { font-size: 0.8rem; color: var(--warning-tx); }
 
 /* code panes */
@@ -1068,7 +1017,6 @@ function gradeFor(qid: string): number | null {
 .toast-enter-active, .toast-leave-active { transition: all 0.25s ease; }
 
 @media (max-width: 1100px) {
-  .row.split { grid-template-columns: 1fr; }
   .code-row { flex-direction: column; }
   .code-row .pane.left { flex: 1 1 auto; }
   .splitter { display: none; }

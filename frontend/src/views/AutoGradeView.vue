@@ -6,7 +6,7 @@ import { useAutogradeStore } from '../stores/autograde'
 import type { AiQuestionResult } from '../stores/autograde'
 import { anonymizedPreview, downloadGradesCsv } from '../api/client'
 import ProposalCard from '../components/autograde/ProposalCard.vue'
-import ThemeToggle from '../components/ThemeToggle.vue'
+import AppHeader from '../components/AppHeader.vue'
 
 const session = useSessionStore()
 const autograde = useAutogradeStore()
@@ -116,17 +116,11 @@ const tokens = computed(
 
 <template>
   <div class="page">
-    <header class="appbar">
-      <RouterLink to="/" class="title" title="Back to landing">
-        <h1>Granymede</h1>
-        <span class="meta">Auto-grading with Claude · {{ gradable.length }} submissions · {{ session.enabledQuestions.length }} questions</span>
-      </RouterLink>
-      <div class="actions">
-        <button class="btn" @click="router.push('/grading')">← Grading</button>
+    <AppHeader :subtitle="`Auto-grading with Claude · ${gradable.length} submissions`">
+      <template #actions>
         <button class="btn btn-primary" @click="exportCsv">Export CSV</button>
-        <ThemeToggle />
-      </div>
-    </header>
+      </template>
+    </AppHeader>
 
     <main class="body">
       <!-- 1. Connection & privacy -->
@@ -357,26 +351,6 @@ const tokens = computed(
 <style scoped>
 .page { min-height: 100vh; background: var(--bg-page); }
 
-.appbar {
-  background: var(--header-bg);
-  color: var(--header-text);
-  padding: 0.7rem 1.25rem;
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-.appbar h1 { margin: 0; font-size: 1.3rem; font-weight: 700; letter-spacing: -0.015em; }
-.appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
-.appbar .title {
-  display: flex; flex-direction: column;
-  color: inherit; text-decoration: none;
-  padding: 0.25rem 0.55rem; margin: -0.25rem -0.55rem;
-  border-radius: 6px; transition: background 0.15s;
-}
-.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
-.appbar .actions { display: flex; gap: 0.5rem; }
-.appbar .btn { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); color: white; }
-.appbar .btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
-.appbar .btn-primary { background: var(--accent); border-color: var(--accent); }
 
 .body {
   max-width: 1200px;
@@ -388,9 +362,9 @@ const tokens = computed(
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 .card-head {
   display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;

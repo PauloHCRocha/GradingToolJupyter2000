@@ -32,7 +32,7 @@ import HeatmapTab from '../components/plagiarism/HeatmapTab.vue'
 import ClustersTab from '../components/plagiarism/ClustersTab.vue'
 import PairsTab from '../components/plagiarism/PairsTab.vue'
 import CompareModal from '../components/plagiarism/CompareModal.vue'
-import ThemeToggle from '../components/ThemeToggle.vue'
+import AppHeader from '../components/AppHeader.vue'
 
 // Heavy chunks loaded only when actually used.
 //   - vis-network is ~600KB; only the Network tab needs it.
@@ -250,17 +250,7 @@ async function exportFullReport() {
 
 <template>
   <div class="page">
-    <header class="appbar">
-      <RouterLink to="/" class="title" title="Back to landing">
-        <h1>Granymede</h1>
-        <span class="meta">Plagiarism · {{ studentCount }} students loaded</span>
-      </RouterLink>
-      <div class="actions">
-        <button class="btn" @click="router.push('/grading')">← Back to grading</button>
-        <button class="btn" @click="router.push('/setup')">Setup</button>
-        <ThemeToggle />
-      </div>
-    </header>
+    <AppHeader :subtitle="`Plagiarism · ${studentCount} submissions`" />
 
     <main class="body">
       <section v-if="studentCount < 2" class="empty">
@@ -420,43 +410,6 @@ async function exportFullReport() {
 <style scoped>
 .page { min-height: 100vh; background: var(--bg-page); }
 
-.appbar {
-  background: var(--header-bg);
-  color: var(--header-text);
-  padding: 0.7rem 1.25rem;
-  display: flex; align-items: center; justify-content: space-between;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-.appbar h1 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: white;
-}
-.appbar .meta { font-size: 0.78rem; color: rgba(255,255,255,0.75); }
-.appbar .title {
-  display: flex;
-  flex-direction: column;
-  color: inherit;
-  text-decoration: none;
-  padding: 0.25rem 0.55rem;
-  margin: -0.25rem -0.55rem;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.appbar .title:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
-.appbar .title:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 2px; }
-.appbar .actions { display: flex; gap: 0.5rem; }
-.appbar .btn {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.25);
-  color: white;
-  padding: 0.35rem 0.7rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-}
-.appbar .btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
 
 .body {
   max-width: 1500px;
@@ -474,9 +427,9 @@ async function exportFullReport() {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 .card-head {
   display: flex; justify-content: space-between; align-items: center;

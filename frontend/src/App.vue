@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getPyodide, runtimeStage, runtimeError } from './runtime/pyodide'
+import BrandMark from './components/BrandMark.vue'
 
 const route = useRoute()
 
@@ -34,7 +35,7 @@ const stageLabel: Record<string, string> = {
   <Transition name="boot">
     <div v-if="showBoot" class="boot-overlay">
       <div class="boot-card">
-        <h1>Granymede</h1>
+        <h1><BrandMark />Granymede</h1>
         <p class="lead">
           The whole tool runs <strong>inside your browser</strong>.
           Student files <strong>never leave your machine</strong>.

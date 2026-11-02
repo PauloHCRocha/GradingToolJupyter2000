@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
@@ -28,15 +29,32 @@ class StudentRecord:
     invisible_findings: list = field(default_factory=list)
 
 
-def _student_from_path(path: str):
-    parts = PurePosixPath(path).parts
-    for part in parts:
+def _student_from_path(path: str, per_folder: Counter):
+    p = PurePosixPath(path)
+    for part in p.parts:
         match = MOODLE_FOLDER_PATTERN.match(part)
         if match:
             return match.group("name"), match.group("number")
-    parent = parts[-2] if len(parts) >= 2 else "unknown"
-    stem = PurePosixPath(path).stem
-    return parent, stem
+    # One submission per folder ("Ana Silva/ficha3.py"): the folder is the
+    # student. Several in one folder ("turma/1234.py", "turma/4566.py") or
+    # none at all ("1234.py"): each file is.
+    folder = str(p.parent)
+    if folder != "." and per_folder[folder] == 1:
+        return p.parent.name, p.parent.name
+    return p.stem, p.stem
+
+
+def _is_submission(path: str) -> bool:
+    lower = path.lower()
+    if not (lower.endswith(".py") or lower.endswith(".ipynb")):
+        return False
+    # macOS resource forks ("__MACOSX/…", "._ficha.py") and Jupyter autosaves.
+    return not (
+        "__macosx/" in lower
+        or PurePosixPath(lower).name.startswith("._")
+        or ".ipynb_checkpoints/" in lower
+        or lower.endswith("-checkpoint.ipynb")
+    )
 
 
 def join_code_cells(cells: list[Cell]) -> str:
@@ -52,56 +70,70 @@ def _to_bytes(content) -> bytes:
     return bytes(content)
 
 
-def load_zip(content) -> tuple[list[StudentRecord], list[str]]:
+def _load_entries(entries) -> tuple[list[StudentRecord], list[str]]:
+    """entries: (path, read) pairs, read() returning the file's bytes."""
     records: list[StudentRecord] = []
     warnings: list[str] = []
-    seen_ids: set = set()
+    first_file: dict[str, str] = {}
+    per_folder = Counter(str(PurePosixPath(path).parent) for path, _ in entries)
 
-    data = _to_bytes(content)
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        for info in zf.infolist():
-            if info.is_dir():
-                continue
-            name_lower = info.filename.lower()
-            if not (name_lower.endswith(".ipynb") or name_lower.endswith(".py")):
-                continue
-            if "__macosx" in name_lower or name_lower.endswith(".checkpoint.ipynb"):
-                continue
+    for path, read in entries:
+        try:
+            file_data = read()
+        except Exception as e:
+            warnings.append(f"Could not read {path}: {e}")
+            continue
 
-            try:
-                file_data = zf.read(info)
-            except Exception as e:
-                warnings.append(f"Could not read {info.filename}: {e}")
-                continue
+        student_name, student_id = _student_from_path(path, per_folder)
+        if student_id in first_file:
+            warnings.append(f"Skipped {path}: {student_name} already has a submission ({first_file[student_id]}).")
+            continue
+        first_file[student_id] = path
 
-            student_name, student_id = _student_from_path(info.filename)
-            if student_id in seen_ids:
-                continue
-            seen_ids.add(student_id)
+        file_type = "ipynb" if path.lower().endswith(".ipynb") else "py"
+        try:
+            cells = parse_notebook(file_data) if file_type == "ipynb" else parse_python(file_data)
+            source = _to_str(file_data) if file_type == "py" else join_code_cells(cells)
+            error = None
+        except Exception as e:
+            cells = []
+            source = ""
+            error = f"Could not parse {path}: {e}"
+            warnings.append(error)
 
-            file_type = "ipynb" if name_lower.endswith(".ipynb") else "py"
-            try:
-                cells = (
-                    parse_notebook(file_data) if file_type == "ipynb" else parse_python(file_data)
-                )
-                source = _to_str(file_data) if file_type == "py" else join_code_cells(cells)
-                error = None
-            except Exception as e:
-                cells = []
-                source = ""
-                error = f"Could not parse {info.filename}: {e}"
-                warnings.append(error)
-
-            records.append(
-                StudentRecord(
-                    id=student_id,
-                    name=student_name,
-                    filename=PurePosixPath(info.filename).name,
-                    file_type=file_type,
-                    cells=cells,
-                    source=source,
-                    error=error,
-                )
+        records.append(
+            StudentRecord(
+                id=student_id,
+                name=student_name,
+                filename=PurePosixPath(path).name,
+                file_type=file_type,
+                cells=cells,
+                source=source,
+                error=error,
             )
+        )
 
     return records, warnings
+
+
+def load_zip(content) -> tuple[list[StudentRecord], list[str]]:
+    with zipfile.ZipFile(io.BytesIO(_to_bytes(content))) as zf:
+        entries = [
+            (info.filename, (lambda info=info: zf.read(info)))
+            for info in zf.infolist()
+            if not info.is_dir() and _is_submission(info.filename)
+        ]
+        return _load_entries(entries)
+
+
+def load_files(files) -> tuple[list[StudentRecord], list[str]]:
+    """Loose student files dropped without a zip: [{"name", "content"}].
+    Each file is one student, named after the file."""
+    if hasattr(files, "to_py"):
+        files = files.to_py()
+    entries = [
+        (f["name"], (lambda f=f: _to_bytes(f["content"])))
+        for f in files
+        if _is_submission(f["name"])
+    ]
+    return _load_entries(entries)

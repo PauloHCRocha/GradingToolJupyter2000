@@ -1,0 +1,42 @@
+<script setup lang="ts">
+/**
+ * The Granymede mark: Ganymede — Jupiter's largest moon, as in Jupyter — on
+ * its orbit, with a grading tick. Same artwork as public/favicon.svg.
+ * Sized in em, so it follows the text it sits next to.
+ */
+import { useId } from 'vue'
+
+// Each copy on the page needs its own gradient id.
+const gradient = `${useId()}-moon`
+</script>
+
+<template>
+  <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient :id="gradient" x1="16" y1="12" x2="48" y2="52" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#60a5fa" />
+        <stop offset=".55" stop-color="#2563eb" />
+        <stop offset="1" stop-color="#4338ca" />
+      </linearGradient>
+    </defs>
+    <circle cx="30" cy="34" r="20" :fill="`url(#${gradient})`" />
+    <circle cx="38.5" cy="22.5" r="3" fill="#fff" opacity=".2" />
+    <circle cx="20" cy="43" r="2" fill="#fff" opacity=".15" />
+    <path d="M6.5 47A28 28 0 0 0 52 16" fill="none" stroke="#a78bfa" stroke-width="3.2" stroke-linecap="round"
+          transform="rotate(8 30 34)" />
+    <circle cx="55.5" cy="13" r="4.6" fill="#7c3aed" />
+    <path d="M20.5 34.5l6.5 6.5 12.5-14" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"
+          stroke-linejoin="round" />
+  </svg>
+</template>
+
+<style scoped>
+.brand-mark {
+  display: inline-block;
+  flex: none;
+  width: 1.35em;
+  height: 1.35em;
+  margin-right: 0.4em;
+  vertical-align: -0.3em;
+}
+</style>
