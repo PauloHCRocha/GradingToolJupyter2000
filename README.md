@@ -24,7 +24,12 @@ served as static files from GitHub Pages; no upload happens at any point.
 - **Suggest grade** — multi-criteria heuristic comparing student code with the reference
 - **Run code** — runs the teacher's working copy of the submission (and the solution,
   for comparison) in a separate Pyodide worker with a time limit; edits never touch
-  the original submission
+  the original submission. The output appears in an interactive console: when the
+  program calls `input()`, the teacher types the answer inline (pasting several lines
+  answers several calls), and can replay the same answers on the solution to compare
+  outputs. Each answer re-runs the program from the start with every answer so far
+  (the browser can't pause Python mid-run without cross-origin isolation, which
+  GitHub Pages can't enable); `random` is seeded per console so replays match.
 - **Auto-grade with Claude** (optional) — see below
 - **Plagiarism detection** — TF-IDF + AST + token similarity, suspicious-pair list, similarity matrix
 - **Invisible-Unicode detection** — flags zero-width chars and other AI-paste tells

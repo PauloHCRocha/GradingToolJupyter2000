@@ -5,7 +5,6 @@
  */
 
 import { callApi } from '../runtime/pyodide'
-import { runInWorker } from '../runtime/runner'
 
 export interface DetectedQuestion {
   id: string
@@ -102,13 +101,6 @@ export interface SuggestResponse {
   confidence: 'high' | 'medium' | 'low' | 'none'
   comment: string
   max_points: number
-}
-
-export interface RunCodeResponse {
-  success: boolean
-  output: string
-  error: string
-  duration_ms: number
 }
 
 export interface SuspiciousPair {
@@ -254,10 +246,6 @@ export async function suggestGrade(
   questionId: string,
 ): Promise<SuggestResponse> {
   return callApi<SuggestResponse>('suggest', studentId, questionId)
-}
-
-export async function runCode(code: string, stdin = '', timeoutMs?: number): Promise<RunCodeResponse> {
-  return runInWorker(code, stdin, timeoutMs)
 }
 
 export async function anonymizedSubmissions(

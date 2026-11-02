@@ -18,7 +18,8 @@ const PYODIDE_CDN = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
 export interface RunRequest {
   id: number
   code: string
-  stdin: string
+  inputs: string[]
+  seed: number
 }
 
 let pyodidePromise: Promise<PyodideInterface> | null = null
@@ -44,7 +45,7 @@ import runner
 }
 
 self.onmessage = async (e: MessageEvent<RunRequest>) => {
-  const { id, code, stdin } = e.data
+  const { id, code, inputs, seed } = e.data
   try {
     const pyodide = await getPyodide()
     // numpy / pandas / matplotlib… are fetched from the Pyodide CDN on first
@@ -55,7 +56,10 @@ self.onmessage = async (e: MessageEvent<RunRequest>) => {
       /* unknown module: let the import fail inside the student's code */
     }
     const runner = pyodide.pyimport('runner')
-    const proxy = runner.run_code(code, stdin)
+    // Periodic snapshots of the output, so a run that gets killed for
+    // taking too long can still show what it printed.
+    const onChunk = (json: string) => self.postMessage({ id, chunk: json })
+    const proxy = runner.run_code(code, pyodide.toPy(inputs), seed, onChunk)
     const result = proxy.toJs({ dict_converter: Object.fromEntries })
     proxy.destroy()
     runner.destroy()
