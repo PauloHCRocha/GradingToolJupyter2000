@@ -5,6 +5,7 @@
  */
 
 import { callApi } from '../runtime/pyodide'
+import { runInWorker } from '../runtime/runner'
 
 export interface DetectedQuestion {
   id: string
@@ -18,6 +19,8 @@ export interface DetectedQuestion {
 export interface SolutionAnalysis {
   filename: string
   file_type: 'ipynb' | 'py'
+  /** 'whole_file': a .py with no question markers, graded as one question. */
+  detection: 'questions' | 'whole_file' | 'none'
   questions: DetectedQuestion[]
   total_max_points: number
   question_windows: Record<string, number[]>
@@ -35,6 +38,8 @@ export interface SolutionDetail {
   file_type: 'ipynb' | 'py'
   cells: CellOut[]
   question_windows: Record<string, number[]>
+  /** Whole file (.py) or all code cells joined (.ipynb) — runnable as-is. */
+  source: string
 }
 
 export interface StudentInfo {
@@ -62,6 +67,16 @@ export interface StudentDetail {
   cells: CellOut[]
   question_windows: Record<string, number[]>
   invisible_findings: InvisibleFinding[]
+  /** The original submission text. Never edited — see session.workingCopies. */
+  source: string
+}
+
+export interface AnonymizedSubmission {
+  student_id: string
+  pseudonym: string
+  file_type: 'ipynb' | 'py'
+  text: string
+  redactions: number
 }
 
 export interface SubmissionsUploadResult {
@@ -241,8 +256,27 @@ export async function suggestGrade(
   return callApi<SuggestResponse>('suggest', studentId, questionId)
 }
 
-export async function runCode(code: string, stdin = ''): Promise<RunCodeResponse> {
-  return callApi<RunCodeResponse>('run_code', code, stdin)
+export async function runCode(code: string, stdin = '', timeoutMs?: number): Promise<RunCodeResponse> {
+  return runInWorker(code, stdin, timeoutMs)
+}
+
+export async function anonymizedSubmissions(
+  stripComments: boolean,
+  includeOutputs: boolean,
+): Promise<AnonymizedSubmission[]> {
+  return callApi<AnonymizedSubmission[]>('anonymized_submissions', stripComments, includeOutputs)
+}
+
+export async function anonymizedPreview(
+  studentId: string,
+  stripComments: boolean,
+  includeOutputs: boolean,
+): Promise<{ text: string; redactions: number }> {
+  return callApi('anonymized_preview', studentId, stripComments, includeOutputs)
+}
+
+export async function anonymizeReference(text: string, kind: 'code' | 'text'): Promise<string> {
+  return callApi<string>('anonymize_reference', text, kind)
 }
 
 export async function plagiarismAnalyze(
@@ -270,7 +304,9 @@ export async function plagiarismCompare(
 
 export async function downloadGradesCsv(): Promise<void> {
   const csv = await callApi<string>('export_grades_csv')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  // The BOM makes Excel read the file as UTF-8 (accented names stay
+  // readable); Moodle's importer strips it.
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

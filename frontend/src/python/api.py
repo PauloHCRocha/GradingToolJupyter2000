@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import csv as _csv
 import io
-import sys
-import time
-import traceback
-from dataclasses import asdict
+import secrets
 
 import ai_detection
+import anonymizer
 import grade_suggester
 import notebook_parser
 import plagiarism
@@ -56,8 +54,15 @@ def analyze_solution(content, filename):
     file_type, hits = question_detector.detect(filename, content)
     if file_type == "ipynb":
         cells = notebook_parser.parse_notebook(content)
+        source = submission_loader.join_code_cells(cells)
     else:
         cells = notebook_parser.parse_python(content)
+        source = notebook_parser._to_str(content)
+
+    detection = "questions" if hits else "none"
+    if not hits and file_type == "py" and cells:
+        hits = [question_detector.whole_file_hit(cells)]
+        detection = "whole_file"
 
     questions = [
         {
@@ -73,15 +78,25 @@ def analyze_solution(content, filename):
         }
         for h in hits
     ]
-    windows = question_window.compute_windows(cells, questions)
-    state.set_solution(filename, file_type, cells, questions, windows)
+    windows = _single_question_windows(file_type, cells, questions) or question_window.compute_windows(cells, questions)
+    state.set_solution(filename, file_type, cells, questions, windows, source)
     return {
         "filename": filename,
         "file_type": file_type,
+        "detection": detection,
         "questions": questions,
         "total_max_points": sum(q["max_points"] for q in questions if q.get("enabled", True)),
         "question_windows": windows,
     }
+
+
+def _single_question_windows(file_type, cells, questions):
+    """A .py assignment with one question: that question is the whole file,
+    imports above its header included — and so is every student's answer,
+    whether or not they kept the header."""
+    if file_type == "py" and len(questions) == 1 and cells:
+        return {questions[0]["id"]: list(range(len(cells)))}
+    return None
 
 
 def update_questions(questions):
@@ -105,6 +120,7 @@ def get_solution_cells():
         "file_type": file_type or "ipynb",
         "cells": [_cell_to_dict(c) for c in cells],
         "question_windows": windows,
+        "source": state.get_solution_source(),
     }
 
 
@@ -117,19 +133,27 @@ def upload_submissions(content):
     questions = state.get_questions()
     for rec in records:
         if rec.cells:
-            student_questions = question_window.detect_in_cells(rec.cells)
+            student_questions = question_window.detect_in_cells(rec.cells, rec.file_type)
             if questions:
                 student_by_id = {q["id"]: q for q in student_questions}
                 merged = []
                 for q in questions:
                     sq = student_by_id.get(q["id"])
+                    # Notebooks built from the same template line up cell by
+                    # cell, so the solution's position is a fair guess. A .py
+                    # file's cells depend on its own headers — no guessing;
+                    # the UI falls back to the whole file instead.
+                    fallback = q.get("cell_indices", []) if rec.file_type == "ipynb" else []
                     merged.append({
                         **q,
-                        "cell_indices": sq["cell_indices"] if sq else q.get("cell_indices", []),
+                        "cell_indices": sq["cell_indices"] if sq else fallback,
                     })
                 rec.question_windows = question_window.compute_windows(rec.cells, merged)
             else:
                 rec.question_windows = question_window.compute_windows(rec.cells, student_questions)
+            rec.question_windows = (
+                _single_question_windows(rec.file_type, rec.cells, questions) or rec.question_windows
+            )
             rec.invisible_findings = ai_detection.detect_invisible(rec.cells)
         state.add_student(rec)
 
@@ -156,6 +180,7 @@ def get_submission(student_id):
         "cells": [_cell_to_dict(c) for c in rec.cells],
         "question_windows": rec.question_windows,
         "invisible_findings": list(rec.invisible_findings),
+        "source": rec.source,
     }
 
 
@@ -207,35 +232,6 @@ def suggest(student_id, question_id):
         "confidence": confidence,
         "comment": comment,
         "max_points": max_points,
-    }
-
-
-def run_code(code, stdin=""):
-    out_buf = io.StringIO()
-    err_buf = io.StringIO()
-    real_stdin = sys.stdin
-    real_stdout = sys.stdout
-    real_stderr = sys.stderr
-    sys.stdin = io.StringIO(stdin or "")
-    sys.stdout = out_buf
-    sys.stderr = err_buf
-    started = time.perf_counter()
-    success = True
-    try:
-        exec(compile(code or "", "<student_code>", "exec"), {"__name__": "__main__"})
-    except Exception:
-        success = False
-        traceback.print_exc(file=err_buf)
-    finally:
-        sys.stdin = real_stdin
-        sys.stdout = real_stdout
-        sys.stderr = real_stderr
-    duration_ms = int((time.perf_counter() - started) * 1000)
-    return {
-        "success": success,
-        "output": out_buf.getvalue(),
-        "error": err_buf.getvalue(),
-        "duration_ms": duration_ms,
     }
 
 
@@ -377,6 +373,57 @@ def plagiarism_compare(student1_id, student2_id):
         "code1": code1,
         "code2": code2,
     }
+
+
+def _roster_names():
+    return [s.name for s in state.list_students_ordered()]
+
+
+def anonymize_reference(text, kind="code"):
+    """Teacher-side text (statements, reference code) gets the same scrub —
+    a template can mention a student, and nothing personal should leave."""
+    scrubber = anonymizer.Scrubber(roster_names=_roster_names())
+    if kind == "code":
+        return anonymizer.scrub_python(text or "", scrubber)
+    return scrubber.code_wide(scrubber.text(text or ""))
+
+
+def _anonymize_record(rec, roster, strip_comments, include_outputs):
+    scrubber = anonymizer.Scrubber(name=rec.name, number=rec.id, roster_names=roster)
+    if rec.file_type == "py":
+        text = anonymizer.scrub_python(rec.source, scrubber, strip_comments)
+    else:
+        text = anonymizer.anonymize_notebook(rec.cells, scrubber, strip_comments, include_outputs)
+    return text, scrubber.count
+
+
+def anonymized_submissions(strip_comments=False, include_outputs=False):
+    """One scrubbed payload per gradable student, in random order, each with
+    a random pseudonym. Only `text` is ever sent out; `student_id` stays in
+    the browser to map results back."""
+    roster = _roster_names()
+    out = []
+    for rec in state.list_students_ordered():
+        if rec.error is not None or not rec.cells:
+            continue
+        text, count = _anonymize_record(rec, roster, bool(strip_comments), bool(include_outputs))
+        out.append({
+            "student_id": rec.id,
+            "pseudonym": "S-" + secrets.token_hex(3).upper(),
+            "file_type": rec.file_type,
+            "text": text,
+            "redactions": count,
+        })
+    secrets.SystemRandom().shuffle(out)
+    return out
+
+
+def anonymized_preview(student_id, strip_comments=False, include_outputs=False):
+    rec = state.get_student(student_id)
+    if rec is None:
+        raise ValueError(f"Student {student_id} not found.")
+    text, count = _anonymize_record(rec, _roster_names(), bool(strip_comments), bool(include_outputs))
+    return {"text": text, "redactions": count}
 
 
 def export_grades_csv():

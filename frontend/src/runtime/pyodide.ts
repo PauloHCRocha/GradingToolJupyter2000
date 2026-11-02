@@ -20,6 +20,7 @@ import aiDetectionPy from '../python/ai_detection.py?raw'
 import gradeSuggesterPy from '../python/grade_suggester.py?raw'
 import plagiarismPy from '../python/plagiarism.py?raw'
 import statePy from '../python/state.py?raw'
+import anonymizerPy from '../python/anonymizer.py?raw'
 import apiPy from '../python/api.py?raw'
 
 const PYODIDE_VERSION = '0.29.3'
@@ -55,6 +56,7 @@ export function getPyodide(): Promise<PyodideInterface> {
           '/home/pyodide/grade_suggester.py': gradeSuggesterPy,
           '/home/pyodide/plagiarism.py': plagiarismPy,
           '/home/pyodide/state.py': statePy,
+          '/home/pyodide/anonymizer.py': anonymizerPy,
           '/home/pyodide/api.py': apiPy,
         }
         for (const [path, content] of Object.entries(files)) {

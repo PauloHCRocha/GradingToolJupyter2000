@@ -22,6 +22,10 @@
   --danger: #dc2626;
   --danger-soft: #fee2e2;
   --suggest: #d97706;
+  /* Claude auto-grading: buttons, tags, proposed-grade cells. */
+  --ai: #7c3aed;
+  --ai-hover: #6d28d9;
+  --ai-soft: #f5f3ff;
 
   --code-bg: #f6f8fa;
   --code-border: #e5e7eb;
@@ -85,6 +89,9 @@
   --danger: #f87171;
   --danger-soft: rgba(248, 113, 113, 0.18);
   --suggest: #f59e0b;
+  --ai: #7c3aed;
+  --ai-hover: #8b5cf6;
+  --ai-soft: rgba(139, 92, 246, 0.1);
 
   --code-bg: #0d1117;
   --code-border: #2a3142;
