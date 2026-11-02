@@ -4,11 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 import { useAutogradeStore } from '../stores/autograde'
 import type { ReviewStatus } from '../stores/autograde'
-import { downloadGradesCsv, runCode, suggestGrade } from '../api/client'
-import type { CellOut, RunCodeResponse, SuggestResponse } from '../api/client'
-import { runnerWarmingUp } from '../runtime/runner'
+import { downloadGradesCsv, suggestGrade } from '../api/client'
+import type { CellOut, SuggestResponse } from '../api/client'
+import { useRunConsole } from '../runtime/runConsole'
 import NotebookViewer from '../components/NotebookViewer.vue'
 import CodeEditor from '../components/CodeEditor.vue'
+import RunConsole from '../components/RunConsole.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 
 const session = useSessionStore()
@@ -22,11 +23,9 @@ const suggesting = ref(false)
 const error = ref<string | null>(null)
 const toast = ref<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
-const runnerStdin = ref('')
 const runnerTimeout = ref(10)
-const runnerResult = ref<RunCodeResponse | null>(null)
-const solutionResult = ref<RunCodeResponse | null>(null)
-const runnerLoading = ref<'student' | 'solution' | null>(null)
+const studentConsole = useRunConsole()
+const solutionConsole = useRunConsole()
 
 // The runner edits the teacher's working copy of the whole submission. It
 // starts as the original and is kept per student, so switching students or
@@ -47,14 +46,15 @@ const workingCopy = computed({
 })
 const solutionSource = computed(() => session.solutionDetail?.source ?? '')
 
-const sameOutput = computed(
-  () =>
-    !!runnerResult.value &&
-    !!solutionResult.value &&
-    runnerResult.value.success &&
-    solutionResult.value.success &&
-    runnerResult.value.output.trim() === solutionResult.value.output.trim(),
-)
+// Both consoles finished with the same answers typed in → compare what
+// they printed (input() prompts ignored: their wording often differs).
+const comparison = computed<'same' | 'different' | 'other-inputs' | null>(() => {
+  const a = studentConsole.state
+  const b = solutionConsole.state
+  if (a.status !== 'done' || b.status !== 'done') return null
+  if (a.inputs.join('\n') !== b.inputs.join('\n')) return 'other-inputs'
+  return studentConsole.printed.value === solutionConsole.printed.value ? 'same' : 'different'
+})
 
 // "This question" shows each side's window; "Whole file" shows everything.
 const viewScope = ref<'question' | 'file'>('question')
@@ -143,7 +143,7 @@ const studentCellsForQuestion = computed<CellOut[]>(() => {
 watch(
   () => session.studentDetail?.info.id,
   () => {
-    runnerResult.value = null
+    studentConsole.clear()
   },
 )
 
@@ -317,23 +317,12 @@ async function onSuggest() {
   }
 }
 
-async function run(which: 'student' | 'solution') {
-  runnerLoading.value = which
-  const target = which === 'student' ? runnerResult : solutionResult
-  target.value = null
-  const code = which === 'student' ? workingCopy.value : solutionSource.value
-  try {
-    target.value = await runCode(code, runnerStdin.value, runnerTimeout.value * 1000)
-  } catch (e) {
-    target.value = {
-      success: false,
-      output: '',
-      error: e instanceof Error ? e.message : String(e),
-      duration_ms: 0,
-    }
-  } finally {
-    runnerLoading.value = null
-  }
+function runStudent(inputs: string[] = [], seed?: number) {
+  void studentConsole.start(workingCopy.value, runnerTimeout.value * 1000, inputs, seed)
+}
+
+function runSolution(inputs: string[] = [], seed?: number) {
+  void solutionConsole.start(solutionSource.value, runnerTimeout.value * 1000, inputs, seed)
 }
 
 function resetWorkingCopy() {
@@ -605,10 +594,10 @@ function gradeFor(qid: string): number | null {
           />
         </div>
         <div class="run-row">
-          <textarea class="stdin" v-model="runnerStdin" rows="2"
-                    placeholder="Input for input() — one line per call (optional)" />
+          <button class="btn" :disabled="!workingCopyEdited" @click="resetWorkingCopy">Reset to original</button>
+          <span class="grow" />
           <label class="timeout">
-            Stop after
+            Stop a run after
             <select v-model.number="runnerTimeout">
               <option :value="5">5 s</option>
               <option :value="10">10 s</option>
@@ -616,42 +605,36 @@ function gradeFor(qid: string): number | null {
               <option :value="60">60 s</option>
             </select>
           </label>
-          <button class="btn" :disabled="!workingCopyEdited" @click="resetWorkingCopy">Reset to original</button>
-          <button class="btn" :disabled="!!runnerLoading || !solutionSource" @click="run('solution')">
-            <span v-if="runnerLoading === 'solution'" class="spin" />
-            Run solution
-          </button>
-          <button class="btn btn-primary" :disabled="!!runnerLoading" @click="run('student')">
-            <span v-if="runnerLoading === 'student'" class="spin" />
-            {{ runnerLoading === 'student' ? 'Running…' : 'Run student code' }}
-          </button>
         </div>
-        <p v-if="runnerLoading && runnerWarmingUp" class="runner-hint">
-          Starting the code runner (first run only, a few seconds)…
+        <div class="consoles">
+          <RunConsole :run="studentConsole" title="Student" variant="student">
+            <template #actions>
+              <button class="btn btn-small btn-primary" @click="runStudent()">▶ Run</button>
+            </template>
+            <template #inputs-actions>
+              <button v-if="solutionSource" class="btn btn-small"
+                      @click="runSolution(studentConsole.state.inputs, studentConsole.state.seed)">
+                Run solution with these →
+              </button>
+            </template>
+          </RunConsole>
+          <RunConsole :run="solutionConsole" title="Solution" variant="solution">
+            <template #actions>
+              <button class="btn btn-small" :disabled="!solutionSource" @click="runSolution()">▶ Run</button>
+            </template>
+            <template #inputs-actions>
+              <button class="btn btn-small"
+                      @click="runStudent(solutionConsole.state.inputs, solutionConsole.state.seed)">
+                ← Run student with these
+              </button>
+            </template>
+          </RunConsole>
+        </div>
+        <p v-if="comparison" class="compare" :class="comparison">
+          <template v-if="comparison === 'same'">✓ Same output as the solution for these inputs (prompts ignored)</template>
+          <template v-else-if="comparison === 'different'">≠ The output differs from the solution for these inputs</template>
+          <template v-else>The two runs used different inputs — use “Run … with these” to compare them.</template>
         </p>
-        <div v-if="runnerResult || solutionResult" class="run-out">
-          <p v-if="runnerResult && solutionResult" class="compare" :class="sameOutput ? 'ok' : 'diff'">
-            {{ sameOutput ? '✓ Same output as the solution' : '≠ Output differs from the solution' }}
-          </p>
-          <div class="run-cols">
-            <div v-if="solutionResult" class="run-col">
-              <span class="lbl">
-                Solution · {{ solutionResult.success ? '✓' : '✗' }} {{ solutionResult.duration_ms }}ms
-              </span>
-              <pre v-if="solutionResult.output">{{ solutionResult.output }}</pre>
-              <pre v-if="solutionResult.error" class="err">{{ solutionResult.error }}</pre>
-              <pre v-if="!solutionResult.output && !solutionResult.error" class="empty">(no output)</pre>
-            </div>
-            <div v-if="runnerResult" class="run-col">
-              <span class="lbl" :class="runnerResult.success ? 'ok' : 'err'">
-                Student · {{ runnerResult.success ? '✓' : '✗' }} {{ runnerResult.duration_ms }}ms
-              </span>
-              <pre v-if="runnerResult.output">{{ runnerResult.output }}</pre>
-              <pre v-if="runnerResult.error" class="err">{{ runnerResult.error }}</pre>
-              <pre v-if="!runnerResult.output && !runnerResult.error" class="empty">(no output)</pre>
-            </div>
-          </div>
-        </div>
       </section>
     </main>
 
@@ -1034,16 +1017,9 @@ function gradeFor(qid: string): number | null {
   display: flex; gap: 0.5rem; align-items: center;
   padding: 0 0.8rem 0.7rem;
 }
-.run-row { flex-wrap: wrap; }
-.run-row .stdin {
-  flex: 1; min-width: 220px; padding: 0.4rem 0.55rem;
-  font-size: 0.85rem;
-  font-family: ui-monospace, monospace;
-  resize: vertical;
-}
+.run-row .grow { flex: 1; }
 .run-row .timeout { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; }
 .run-row .timeout select { padding: 0.3rem 0.4rem; font-size: 0.82rem; }
-.runner-hint { margin: 0 0.8rem 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
 .edited-pill {
   margin-left: 0.4rem;
   padding: 1px 7px;
@@ -1054,30 +1030,16 @@ function gradeFor(qid: string): number | null {
   color: var(--warning-tx);
   border: 1px solid var(--warning-bd);
 }
-.run-out { padding: 0 0.8rem 0.85rem; }
-.run-out .compare { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; }
-.run-out .compare.ok { color: var(--success); }
-.run-out .compare.diff { color: var(--warning); }
-.run-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.6rem; }
-.run-col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
-.run-out .lbl {
-  display: inline-block;
-  font-size: 0.7rem; text-transform: uppercase;
-  color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 0.2rem;
+.consoles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0.6rem;
+  padding: 0 0.8rem 0.8rem;
 }
-.run-out .lbl.ok { color: var(--success); }
-.run-out .lbl.err { color: var(--danger); }
-.run-out pre.empty { color: var(--text-muted); font-style: italic; }
-.run-out pre {
-  margin: 0; padding: 0.55rem 0.7rem;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-family: ui-monospace, monospace; font-size: 0.82rem;
-  white-space: pre-wrap; word-break: break-word;
-  max-height: 240px; overflow: auto;
-}
-.run-out pre.err { border-color: var(--danger); background: var(--danger-soft); color: var(--danger-tx); }
+.compare { margin: 0 0.8rem 0.85rem; font-size: 0.85rem; font-weight: 600; }
+.compare.same { color: var(--success); }
+.compare.different { color: var(--warning); }
+.compare.other-inputs { color: var(--text-muted); font-weight: 400; }
 
 /* spinner */
 .spin {

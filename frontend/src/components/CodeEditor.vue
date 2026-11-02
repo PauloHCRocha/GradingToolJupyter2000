@@ -57,19 +57,88 @@ function onScroll() {
   preEl.value.scrollLeft = textareaEl.value.scrollLeft
 }
 
-// Tab inserts spaces instead of moving focus.
+const INDENT = 4
+
+/** Replace [start, end) with `text`, then optionally select [selStart, selEnd).
+ *  Goes through execCommand so the browser's undo history (Cmd/Ctrl+Z)
+ *  survives — assigning `.value` would wipe it. */
+function edit(t: HTMLTextAreaElement, start: number, end: number, text: string, selStart?: number, selEnd?: number) {
+  t.setSelectionRange(start, end)
+  const ok = text === '' ? document.execCommand('delete') : document.execCommand('insertText', false, text)
+  if (!ok) {
+    t.setRangeText(text, start, end, 'end')
+    emit('update:modelValue', t.value)
+  }
+  if (selStart !== undefined) t.setSelectionRange(selStart, selEnd ?? selStart)
+}
+
+const lineStartOf = (v: string, pos: number) => v.lastIndexOf('\n', pos - 1) + 1
+
+/** Indent (or with `out`, dedent) every line the selection touches. */
+function shiftLines(t: HTMLTextAreaElement, out: boolean) {
+  const { selectionStart: s, selectionEnd: e, value: v } = t
+  const from = lineStartOf(v, s)
+  // A selection ending at the very start of a line doesn't include that line.
+  const last = e > s && v[e - 1] === '\n' ? e - 1 : e
+  const to = v.indexOf('\n', last) === -1 ? v.length : v.indexOf('\n', last)
+  const block = v.slice(from, to)
+  const lines = block.split('\n')
+  const changed = lines
+    .map((l) => (out ? l.replace(new RegExp(`^ {1,${INDENT}}|^\\t`), '') : ' '.repeat(INDENT) + l))
+    .join('\n')
+  if (changed === block) return
+  if (s === e) {
+    // Caret only: keep it where it was relative to the text.
+    const caret = Math.max(from, s + (changed.length - block.length))
+    edit(t, from, to, changed, caret)
+  } else {
+    edit(t, from, to, changed, from, from + changed.length)
+  }
+}
+
+// After Escape, the next Tab leaves the editor instead of indenting —
+// otherwise keyboard users would be trapped inside it.
+let tabLeaves = false
+
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key !== 'Tab') return
-  e.preventDefault()
+  if (e.isComposing) return
   const t = e.target as HTMLTextAreaElement
-  const start = t.selectionStart
-  const end = t.selectionEnd
-  const value = t.value
-  const next = value.slice(0, start) + '    ' + value.slice(end)
-  emit('update:modelValue', next)
-  void nextTick(() => {
-    t.selectionStart = t.selectionEnd = start + 4
-  })
+  const { selectionStart: s, selectionEnd: end, value: v } = t
+
+  if (e.key === 'Escape') {
+    tabLeaves = true
+    return
+  }
+  if (e.key === 'Tab') {
+    if (tabLeaves) {
+      tabLeaves = false
+      return
+    }
+    e.preventDefault()
+    if (e.shiftKey || s !== end) shiftLines(t, e.shiftKey)
+    else edit(t, s, end, ' '.repeat(INDENT - ((s - lineStartOf(v, s)) % INDENT)))
+    return
+  }
+  tabLeaves = false
+
+  // Enter keeps the line's indentation, one level deeper after a ":".
+  if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    e.preventDefault()
+    const before = v.slice(lineStartOf(v, s), s)
+    let indent = before.match(/^[ \t]*/)![0]
+    if (/:\s*(#.*)?$/.test(before) && !before.trimStart().startsWith('#')) indent += ' '.repeat(INDENT)
+    edit(t, s, end, '\n' + indent)
+    return
+  }
+
+  // Backspace inside leading spaces removes one indentation level.
+  if (e.key === 'Backspace' && s === end && !e.metaKey && !e.altKey && !e.ctrlKey) {
+    const before = v.slice(lineStartOf(v, s), s)
+    if (before.length && /^ +$/.test(before)) {
+      e.preventDefault()
+      edit(t, s - (((before.length - 1) % INDENT) + 1), s, '')
+    }
+  }
 }
 
 // Re-sync scroll after content changes (e.g. external programmatic edits).
@@ -104,8 +173,11 @@ watch(() => props.modelValue, () => {
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   overflow: hidden;
-  /* The container's height drives both the <pre> and <textarea>. */
+  /* The container's height drives both the <pre> and <textarea>; drag the
+     bottom-right corner to make it taller. */
   height: calc(var(--rows, 12) * 1.5em + 1.1rem);
+  min-height: calc(4 * 1.5em + 1.1rem);
+  resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85rem;
   line-height: 1.5;
@@ -127,6 +199,7 @@ watch(() => props.modelValue, () => {
   border: 0;
   background: transparent;
   tab-size: 4;
+  font-variant-ligatures: none;
 }
 
 .code-editor .hl {
@@ -136,6 +209,9 @@ watch(() => props.modelValue, () => {
 .code-editor .hl :deep(code.hljs) {
   background: transparent;
   padding: 0;
+  /* Browsers give <code> `font-family: monospace` — a different font from
+     the textarea's, which put the caret off the visible text. */
+  font: inherit;
 }
 
 .code-editor .input {
