@@ -37,6 +37,12 @@ const steps = computed(() => [
 
 <template>
   <header class="appbar app-header">
+    <!-- The logo's orbit, faintly, as on the start page. -->
+    <svg class="orbit" viewBox="0 0 600 120" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+      <ellipse cx="430" cy="70" rx="300" ry="62" transform="rotate(-8 430 70)" />
+      <ellipse cx="430" cy="70" rx="190" ry="38" transform="rotate(-8 430 70)" />
+      <circle cx="612" cy="40" r="4" />
+    </svg>
     <RouterLink to="/" class="brand" title="Back to the start page">
       <BrandMark />
       <span class="brand-text">
@@ -64,6 +70,8 @@ const steps = computed(() => [
 
 <style scoped>
 .app-header {
+  position: relative;
+  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -73,6 +81,19 @@ const steps = computed(() => [
   color: var(--header-text);
   box-shadow: 0 2px 12px rgba(15, 23, 42, 0.12);
 }
+
+.orbit {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 60%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+.orbit circle { fill: var(--ai); stroke: none; opacity: 0.7; }
+.brand, .steps, .actions { position: relative; }
 
 .brand {
   display: inline-flex;
@@ -89,7 +110,7 @@ const steps = computed(() => [
 }
 .brand:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
 .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.name { font-weight: 700; letter-spacing: -0.015em; }
+.name { font-family: var(--serif); font-weight: 650; letter-spacing: -0.01em; }
 .subtitle {
   font-size: 0.74rem;
   color: rgba(255, 255, 255, 0.72);

@@ -123,6 +123,10 @@ const tokens = computed(
     </AppHeader>
 
     <main class="body">
+      <header class="page-head">
+        <h1 class="page-title">Auto-grading with Claude</h1>
+        <p class="page-sub">Claude drafts a rubric and proposes the grades. Nothing counts until you review it.</p>
+      </header>
       <!-- 1. Connection & privacy -->
       <section class="card">
         <header class="card-head">
@@ -373,7 +377,7 @@ const tokens = computed(
   border-bottom: 1px solid var(--border);
 }
 .card-head h2 {
-  margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-strong);
+  margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--text-strong);
   display: flex; align-items: center; gap: 0.55rem;
 }
 .card-head .num {
