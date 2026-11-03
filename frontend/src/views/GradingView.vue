@@ -747,7 +747,7 @@ function gradeFor(qid: string): number | null {
   background: var(--bg-soft);
   border-bottom: 1px solid var(--border);
 }
-.card-head h3 { margin: 0; font-size: 0.85rem; color: var(--text-strong); font-weight: 600; }
+.card-head h3 { margin: 0; font-size: 1.02rem; color: var(--text-strong); font-weight: 600; }
 .card-head.solution h3::before { content: ''; }
 .card-head .card-meta { font-size: 0.78rem; color: var(--text-muted); }
 .card-head .card-meta strong { color: var(--text-strong); }

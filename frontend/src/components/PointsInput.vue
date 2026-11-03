@@ -181,7 +181,7 @@ function onKeyDown(e: KeyboardEvent) {
   color: var(--accent);
 }
 .step:active:not(:disabled) {
-  background: var(--accent);
+  background: var(--primary);
   color: white;
 }
 .step:disabled { cursor: not-allowed; opacity: 0.5; }

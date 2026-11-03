@@ -242,6 +242,10 @@ async function onContinue() {
     <AppHeader subtitle="Setup · load the solution and the submissions" />
 
     <main class="body">
+      <header class="page-head">
+        <h1 class="page-title">Set up a grading session</h1>
+        <p class="page-sub">Your solution and the students' work. Drop both and you're ready to grade.</p>
+      </header>
       <ol class="stepper">
         <li :class="{ active: !session.solution, done: !!session.solution }">
           <span class="dot">1</span> Solution file
@@ -438,7 +442,7 @@ async function onContinue() {
   font-size: 0.78rem; font-weight: 600;
 }
 .stepper li.active .dot {
-  background: var(--accent); border-color: var(--accent); color: white;
+  background: var(--primary); border-color: var(--primary); color: white;
 }
 .stepper li.active { color: var(--text-strong); }
 .stepper li.done .dot {
@@ -463,13 +467,13 @@ async function onContinue() {
   border-bottom: 1px solid var(--border);
 }
 .card-head h2 {
-  margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-strong);
+  margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--text-strong);
   display: flex; align-items: center; gap: 0.55rem;
 }
 .card-head .num {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; border-radius: 50%;
-  background: var(--accent); color: white; font-size: 0.78rem;
+  background: var(--primary); color: white; font-size: 0.78rem;
 }
 .card-head .card-meta { font-size: 0.78rem; color: var(--text-muted); }
 .card-body { padding: 1rem 1.1rem; }

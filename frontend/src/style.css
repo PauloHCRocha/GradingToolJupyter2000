@@ -1,13 +1,15 @@
 :root {
-  --bg-page: #f3f5f8;
+  /* Warm paper tones, shared with the start page. */
+  --bg-page: #f7f5f0;
   --bg-card: #ffffff;
-  --bg-soft: #f9fafb;
+  --bg-soft: #faf9f5;
   --bg-input: #ffffff;
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
-  --text: #1f2937;
-  --text-muted: #6b7280;
-  --text-strong: #111827;
+  --border: #e6e2d8;
+  --border-strong: #d5cfc2;
+  --text: #23272f;
+  --text-muted: #6b7180;
+  --text-strong: #15181d;
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
 
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
@@ -16,12 +18,12 @@
      light blue meant for text). */
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
-  --header-bg-2: #17304f;
+  --header-bg-2: #1c3658;
   --radius: 12px;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
   --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
   --accent-soft: #e6efff;
-  --header-bg: #1e3a5f;
+  --header-bg: #12223a;
   --header-text: #ffffff;
 
   --success: #16a34a;
@@ -36,8 +38,8 @@
   --ai-hover: #6d28d9;
   --ai-soft: #f5f3ff;
 
-  --code-bg: #f6f8fa;
-  --code-border: #e5e7eb;
+  --code-bg: #f7f6f2;
+  --code-border: #e6e2d8;
 
   /* For tokens that need a slightly different value in dark mode but
      don't deserve a full custom property. Light mode keeps the
@@ -75,25 +77,25 @@
 
 /* ==================== Dark mode ==================== */
 :root[data-theme="dark"] {
-  --bg-page: #0f1419;
-  --bg-card: #181d27;
-  --bg-soft: #1f2530;
-  --bg-input: #11151c;
-  --border: #2a3142;
-  --border-strong: #3a4458;
-  --text: #d1d5db;
-  --text-muted: #9ca3af;
-  --text-strong: #f3f4f6;
+  --bg-page: #111317;
+  --bg-card: #171a20;
+  --bg-soft: #1c2027;
+  --bg-input: #121418;
+  --border: #2a2f38;
+  --border-strong: #383e4a;
+  --text: #d9d7d1;
+  --text-muted: #9a9fa9;
+  --text-strong: #efede8;
 
   --accent: #60a5fa;
   --accent-hover: #93c5fd;
   --primary: #2563eb;
-  --primary-hover: #3b82f6;
-  --header-bg-2: #06090e;
+  --primary-hover: #1d4ed8;
+  --header-bg-2: #13253d;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
   --accent-soft: rgba(96, 165, 250, 0.18);
-  --header-bg: #0a0f17;
+  --header-bg: #0c1626;
   --header-text: #f3f4f6;
 
   --success: #22c55e;
@@ -186,6 +188,14 @@ button { font-family: inherit; cursor: pointer; }
   outline-offset: 2px;
 }
 
+/* Headings in the workspace share the start page's serif; body text stays sans. */
+.card-head :is(h2, h3),
+.page-title,
+.cs-name { font-family: var(--serif); letter-spacing: -0.01em; }
+.page-title { margin: 0; font-size: 1.85rem; font-weight: 600; line-height: 1.2; color: var(--text-strong); }
+.page-sub { margin: 0.35rem 0 0; color: var(--text-muted); font-size: 0.98rem; }
+.page-head { margin: 0.6rem 0 0.2rem; }
+
 /* Grades and counts line up in columns. */
 .tnum { font-variant-numeric: tabular-nums; }
 
@@ -194,7 +204,7 @@ input, textarea, select {
   background: var(--bg-input);
   color: var(--text);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 input:focus, textarea:focus, select:focus {
   outline: none;
@@ -212,11 +222,14 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid var(--border-strong);
   background: var(--bg-card);
   color: var(--text);
-  padding: 0.45rem 0.85rem;
-  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
   font-size: 0.875rem;
-  transition: background 0.1s, border-color 0.1s;
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.06s;
 }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:hover:not(:disabled) { background: var(--bg-soft); }
 .btn-primary {
   background: var(--primary);
@@ -224,12 +237,13 @@ input:focus, textarea:focus, select:focus {
   color: white;
 }
 .btn-primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+/* Secondary to Save: amber, but quiet. */
 .btn-suggest {
-  background: var(--suggest);
-  border-color: var(--suggest);
-  color: white;
+  background: var(--warning-soft);
+  border-color: var(--warning-bd);
+  color: var(--warning-tx);
 }
-.btn-suggest:hover:not(:disabled) { background: #b45309; border-color: #b45309; }
+.btn-suggest:hover:not(:disabled) { background: var(--warning-bd); border-color: var(--warning); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* keyboard hint chip — used in the grading top nav to surface the ←/→

@@ -253,6 +253,10 @@ async function exportFullReport() {
     <AppHeader :subtitle="`Plagiarism · ${studentCount} submissions`" />
 
     <main class="body">
+      <header class="page-head">
+        <h1 class="page-title">Plagiarism</h1>
+        <p class="page-sub">How similar the submissions are to each other, pair by pair.</p>
+      </header>
       <section v-if="studentCount < 2" class="empty">
         <p>You need at least 2 student submissions to detect plagiarism.</p>
         <button class="btn btn-primary" @click="router.push('/setup')">Go to setup</button>
@@ -437,7 +441,7 @@ async function exportFullReport() {
   background: var(--bg-soft);
   border-bottom: 1px solid var(--border);
 }
-.card-head h3 { margin: 0; font-size: 0.85rem; color: var(--text-strong); font-weight: 600; }
+.card-head h3 { margin: 0; font-size: 1.02rem; color: var(--text-strong); font-weight: 600; }
 .card-head .card-meta { font-size: 0.78rem; color: var(--text-muted); }
 
 .control-row {
@@ -544,7 +548,7 @@ async function exportFullReport() {
   font-size: 0.72rem;
   font-weight: 600;
 }
-.tabbar > button.active .badge { background: var(--accent); color: white; }
+.tabbar > button.active .badge { background: var(--primary); color: white; }
 .tab-spacer { flex: 1 1 auto; }
 .btn-pdf {
   background: var(--danger);

@@ -31,7 +31,8 @@ const renderedCells = computed(() =>
     <template v-for="(cell, i) in renderedCells" :key="cell.cell_id || i">
       <!-- Cell #1: the code (or markdown) itself. -->
       <article class="cell" :class="cell.cell_type">
-        <header class="cell-head">{{ cell.cell_type }}</header>
+        <!-- Code needs no label; markdown and output do, to tell them apart. -->
+        <header v-if="cell.cell_type !== 'code'" class="cell-head">{{ cell.cell_type }}</header>
         <div v-if="cell.cell_type === 'markdown'" class="md" v-html="cell.html" />
         <pre v-else class="code"><code class="hljs language-python" v-html="cell.highlighted"></code></pre>
       </article>
